@@ -892,6 +892,17 @@ body.is-file-list-resizing iframe {
   z-index: 2;
 }
 
+.file-tree-branch {
+  position: absolute;
+  top: 50%;
+  width: 0.95rem;
+  height: 1px;
+  margin-top: -0.5px;
+  background: var(--border);
+  pointer-events: none;
+  z-index: 2;
+}
+
 .file-tree-dir,
 .file-tree-file {
   position: relative;
