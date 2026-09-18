@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Comment, CommitSummary, DiffFile, LineComment, LineType } from './types'
 import { createComment, removeComment } from './api'
 import { buildFileTree, collectDirPaths, type FileTreeNode } from './fileTree'
+import { FileIcon, FolderIcon, StatusIcon } from './icons'
 
 type Props = {
   commit: CommitSummary
@@ -99,6 +100,7 @@ function FileTree({
                 <span className="file-tree-chevron" aria-hidden="true">
                   {isOpen ? '▾' : '▸'}
                 </span>
+                <FolderIcon className="file-tree-icon" />
                 <span className="file-tree-name">{node.name}/</span>
               </button>
               {isOpen ? (
@@ -128,8 +130,9 @@ function FileTree({
               title={node.path}
             >
               <span className={`status status-${node.file.status}`}>
-                {node.file.status[0]!.toUpperCase()}
+                <StatusIcon status={node.file.status} />
               </span>
+              <FileIcon className="file-tree-icon" />
               <span className="file-tree-name">{node.name}</span>
               {count > 0 ? <span className="badge">{count}</span> : null}
             </button>
