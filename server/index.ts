@@ -3,7 +3,6 @@ import { fileURLToPath } from 'node:url'
 import cors from 'cors'
 import express from 'express'
 import {
-  assertGitRepo,
   branchExists,
   detectDefaultBranch,
   getCheckedOutBranch,
@@ -27,14 +26,14 @@ import {
   assertAllowedRepo,
   assertScanRoot,
   listRepos,
-  parsePreferredRepo,
-  parseRepoRoots,
+  parseScanRoot,
 } from './repos.js'
 import { pickDirectory } from './pick-directory.js'
 import { configSchema } from './schema.js'
 
-let roots = parseRepoRoots()
-const preferredRepo = parsePreferredRepo()
+const initialScan = parseScanRoot()
+let roots = [initialScan.root]
+let fromCli = initialScan.fromCli
 const port = Number(process.env.PORT ?? 8787)
 
 const app = express()
@@ -57,7 +56,7 @@ async function resolveRepo(req: express.Request): Promise<string> {
     })
   }
   try {
-    return await assertAllowedRepo(String(raw), roots, preferredRepo ? [preferredRepo] : [])
+    return await assertAllowedRepo(String(raw), roots)
   } catch (error) {
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
       status: 400,
@@ -71,7 +70,7 @@ app.get(
     res.json({
       ok: true,
       roots,
-      preferredRepo,
+      fromCli,
     })
   }),
 )
@@ -81,20 +80,7 @@ async function respondWithRepos(
   extra: Record<string, unknown> = {},
 ): Promise<void> {
   const repos = await listRepos(roots)
-  if (preferredRepo) {
-    try {
-      await assertGitRepo(preferredRepo)
-      if (!repos.some((r) => r.path === preferredRepo)) {
-        repos.unshift({
-          path: preferredRepo,
-          name: path.basename(preferredRepo),
-        })
-      }
-    } catch {
-      // preferred path is not a git repo; ignore
-    }
-  }
-  res.json({ roots, preferredRepo, repos, ...extra })
+  res.json({ roots, fromCli, repos, ...extra })
 }
 
 app.get(
@@ -114,6 +100,7 @@ app.put(
       })
     }
     roots = await Promise.all(raw.map((r) => assertScanRoot(String(r))))
+    fromCli = false
     await respondWithRepos(res)
   }),
 )
@@ -127,6 +114,7 @@ app.post(
       return
     }
     roots = [await assertScanRoot(chosen)]
+    fromCli = false
     await respondWithRepos(res, { cancelled: false })
   }),
 )
@@ -351,6 +339,13 @@ app.use(
 )
 
 async function main() {
+  try {
+    roots = [await assertScanRoot(initialScan.root)]
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error)
+    process.exit(1)
+  }
+
   const isProd = process.env.NODE_ENV === 'production'
   if (isProd) {
     const dist = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist')
@@ -362,8 +357,7 @@ async function main() {
 
   app.listen(port, () => {
     console.log(`branch-review listening on http://localhost:${port}`)
-    console.log(`roots: ${roots.join(', ')}`)
-    if (preferredRepo) console.log(`preferred: ${preferredRepo}`)
+    console.log(`scan root: ${roots.join(', ')}${fromCli ? ' (from CLI)' : ''}`)
   })
 }
 

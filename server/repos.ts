@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs'
 import { access, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { assertGitRepo } from './git.js'
@@ -8,41 +7,20 @@ export type RepoInfo = {
   name: string
 }
 
-export function parsePreferredRepo(): string | null {
-  const fromEnv = process.env.REPO_PATH
-  const fromArg = process.argv.slice(2).find((a) => !a.startsWith('-'))
-  const raw = fromArg ?? fromEnv
-  return raw ? path.resolve(raw) : null
-}
-
-/** Directory used to infer the default scan root (caller cwd, not the app install dir). */
+/** Caller cwd when launched via the bin (not the app install dir). */
 function inferenceCwd(): string {
   return path.resolve(
     process.env.BRANCH_REVIEW_CWD ?? process.env.INIT_CWD ?? process.cwd(),
   )
 }
 
-/** Parent of a repo, or inference cwd when that path is not itself a git work tree. */
-export function defaultRepoRoot(): string {
-  const preferred = parsePreferredRepo()
-  if (preferred) return path.dirname(preferred)
-
-  const cwd = inferenceCwd()
-  if (existsSync(path.join(cwd, '.git'))) {
-    return path.dirname(cwd)
+/** Optional directory argument, else the inference cwd. */
+export function parseScanRoot(): { root: string; fromCli: boolean } {
+  const fromArg = process.argv.slice(2).find((a) => !a.startsWith('-'))
+  if (fromArg) {
+    return { root: path.resolve(fromArg), fromCli: true }
   }
-  return cwd
-}
-
-export function parseRepoRoots(): string[] {
-  const fromEnv = process.env.REPO_ROOTS ?? process.env.REPO_ROOT
-  if (fromEnv?.trim()) {
-    return fromEnv
-      .split(',')
-      .map((s) => path.resolve(s.trim()))
-      .filter(Boolean)
-  }
-  return [defaultRepoRoot()]
+  return { root: inferenceCwd(), fromCli: false }
 }
 
 export async function assertScanRoot(dir: string): Promise<string> {
@@ -73,10 +51,15 @@ async function isGitWorkTree(dir: string): Promise<boolean> {
   }
 }
 
+/** Find git repos at the scan root itself and in its immediate child folders. */
 export async function listRepos(roots: string[]): Promise<RepoInfo[]> {
   const found = new Map<string, RepoInfo>()
 
   for (const root of roots) {
+    if (await isGitWorkTree(root)) {
+      found.set(root, { path: root, name: path.basename(root) })
+    }
+
     let entries: string[]
     try {
       entries = await readdir(root)
@@ -103,15 +86,9 @@ export function isPathInsideRoot(target: string, root: string): boolean {
   )
 }
 
-export async function assertAllowedRepo(
-  repoPath: string,
-  roots: string[],
-  extras: string[] = [],
-): Promise<string> {
+export async function assertAllowedRepo(repoPath: string, roots: string[]): Promise<string> {
   const resolved = path.resolve(repoPath)
-  const allowed =
-    extras.some((e) => path.resolve(e) === resolved) ||
-    roots.some((root) => isPathInsideRoot(resolved, root))
+  const allowed = roots.some((root) => isPathInsideRoot(resolved, root))
   if (!allowed) {
     throw new Error(`Repo path is not under an allowed root: ${resolved}`)
   }

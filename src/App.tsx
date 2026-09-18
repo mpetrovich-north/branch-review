@@ -88,10 +88,7 @@ function repoFromQuery(): string | null {
   return value && value.trim() ? value.trim() : null
 }
 
-function pickInitialRepo(
-  repos: RepoInfo[],
-  preferredRepo: string | null,
-): string | null {
+function pickInitialRepo(repos: RepoInfo[]): string | null {
   const url = parseViewUrl()
   if (url.repoName) {
     const byName = repos.find((r) => r.name === url.repoName)
@@ -99,11 +96,11 @@ function pickInitialRepo(
     const byPath = repos.find((r) => r.path === url.repoName)
     if (byPath) return byPath.path
   }
-  const candidates = [repoFromQuery(), readStoredRepoPath(), preferredRepo]
+  const candidates = [repoFromQuery(), readStoredRepoPath()]
   for (const candidate of candidates) {
     if (candidate && repos.some((r) => r.path === candidate)) return candidate
   }
-  return repos[0]?.path ?? preferredRepo ?? null
+  return repos[0]?.path ?? null
 }
 
 function matchCommitSha(
@@ -232,7 +229,7 @@ export default function App() {
         const listed = await fetchRepos()
         if (cancelled) return
         setRepos(listed.repos)
-        const initial = pickInitialRepo(listed.repos, listed.preferredRepo)
+        const initial = pickInitialRepo(listed.repos)
         if (!initial) {
           setActiveRepoPath(null)
           setRepoPath(null)
@@ -448,7 +445,7 @@ export default function App() {
       const listed = await pickRepoRoot()
       if (listed.cancelled) return
       setRepos(listed.repos)
-      const next = pickInitialRepo(listed.repos, listed.preferredRepo)
+      const next = pickInitialRepo(listed.repos)
       if (!next) {
         setActiveRepoPath(null)
         setRepoPath(null)

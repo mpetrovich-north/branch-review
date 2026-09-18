@@ -5,13 +5,17 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
-const preferred = process.argv[2] ? path.resolve(process.argv[2]) : undefined
+const scanRoot = process.argv[2] ? path.resolve(process.argv[2]) : undefined
 const port = process.env.PORT ?? '8787'
 const callerCwd = process.cwd()
 
 const child = spawn(
   process.execPath,
-  [path.join(root, 'node_modules/tsx/dist/cli.mjs'), path.join(root, 'server/index.ts')],
+  [
+    path.join(root, 'node_modules/tsx/dist/cli.mjs'),
+    path.join(root, 'server/index.ts'),
+    ...(scanRoot ? [scanRoot] : []),
+  ],
   {
     cwd: root,
     stdio: 'inherit',
@@ -19,7 +23,6 @@ const child = spawn(
       ...process.env,
       PORT: port,
       BRANCH_REVIEW_CWD: process.env.BRANCH_REVIEW_CWD ?? callerCwd,
-      ...(preferred ? { REPO_PATH: preferred } : {}),
       NODE_ENV: process.env.NODE_ENV ?? 'production',
     },
   },

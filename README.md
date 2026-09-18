@@ -13,22 +13,23 @@ npm run build
 npm start
 ```
 
-Open http://localhost:8787 and pick a **Repo** in the header.
+Open http://localhost:8787 and pick a **Repo** in the sidebar.
 
-By default the app scans the **current directory**, or the **parent of the
-current/preferred git repo** (so sibling clones appear). Override with
-`REPO_ROOT` / `REPO_ROOTS` when needed.
-
-Optional:
+By default the app scans the **current directory** for git repos (the directory
+itself, and its immediate child folders). Pass a path to scan somewhere else:
 
 ```bash
-# Prefer a repo on first load (still switchable in the UI)
-REPO_PATH=/path/to/your/repo npm start
+npx branch-review /path/to/projects
+# or a single repo
+npx branch-review /path/to/your/repo
+```
 
-# Explicit scan folder
-REPO_ROOT=/path/to/projects npm start
+You can also choose **Change directory…** in the Repo list. That choice is
+remembered for later visits unless you start with a path argument.
 
-# Dev (Vite UI on :5173, API on :8787)
+Dev (Vite UI on :5173, API on :8787):
+
+```bash
 npm run dev
 ```
 
@@ -65,10 +66,8 @@ See [docs/SCHEMA.md](docs/SCHEMA.md).
 
 | Variable | Purpose |
 | --- | --- |
-| `REPO_ROOT` / `REPO_ROOTS` | Folder(s) to scan for git repos (default: cwd, or parent of cwd/preferred repo; comma-separated for several) |
-| `REPO_PATH` | Optional preferred repo for first load |
-| `BRANCH_REVIEW_CWD` | Caller cwd used when inferring the default scan root |
 | `PORT` | API/UI port (default `8787`) |
+| `BRANCH_REVIEW_CWD` | Caller cwd used when no path argument is given (set by the `branch-review` bin) |
 
 ## Requirements
 

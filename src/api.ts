@@ -74,26 +74,31 @@ async function request<T>(apiPath: string, init?: RequestInit): Promise<T> {
 
 export type RepoListResponse = {
   roots: string[]
-  preferredRepo: string | null
+  fromCli: boolean
   repos: RepoInfo[]
   cancelled?: boolean
 }
 
 export async function fetchRepos() {
+  const listed = await request<RepoListResponse>('/api/repos')
+  if (listed.fromCli) {
+    if (listed.roots[0]) setStoredRepoRoot(listed.roots[0])
+    return listed
+  }
   const storedRoot = readStoredRepoRoot()
   if (storedRoot) {
     try {
-      const listed = await request<RepoListResponse>('/api/repo-roots', {
+      const restored = await request<RepoListResponse>('/api/repo-roots', {
         method: 'PUT',
         body: JSON.stringify({ roots: [storedRoot] }),
       })
-      if (listed.roots[0]) setStoredRepoRoot(listed.roots[0])
-      return listed
+      if (restored.roots[0]) setStoredRepoRoot(restored.roots[0])
+      return restored
     } catch {
       setStoredRepoRoot(null)
     }
   }
-  return request<RepoListResponse>('/api/repos')
+  return listed
 }
 
 export async function pickRepoRoot() {
