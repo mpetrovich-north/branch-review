@@ -4,6 +4,8 @@ Local GitHub-style UI to review commits on a branch one at a time and leave comm
 
 This app does not apply fixes. An agent skill (separate) can read `.branch-review/` and change code.
 
+<img width="1624" height="1061" alt="Screenshot 2026-09-18 at 12 40 47" src="https://github.com/user-attachments/assets/72bcc9a5-011e-4a52-83a9-6f155a88a0ec" />
+
 ## Quick start
 
 ```bash
