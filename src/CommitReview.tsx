@@ -244,7 +244,7 @@ function beginEdit() {
             {isEdited ? (
               <button
                 type="button"
-                className="btn link"
+                className="commit-edit-reset"
                 disabled={busy}
                 onClick={() => {
                   void onReset().then(() => {
@@ -437,13 +437,6 @@ function FileTree({
                 onFocus={(e) => onNameHover(e, node.path, label, 'dir')}
                 onBlur={onNameLeave}
               >
-                {depth > 0 ? (
-                  <span
-                    className="file-tree-branch"
-                    style={{ left: `${0.45 + (depth - 1) * 0.7 + 0.28}rem` }}
-                    aria-hidden="true"
-                  />
-                ) : null}
                 <span className="file-tree-chevron" aria-hidden="true">
                   {isOpen ? '▾' : '▸'}
                 </span>
