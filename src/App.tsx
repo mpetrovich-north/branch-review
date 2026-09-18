@@ -157,6 +157,7 @@ export default function App() {
   const [seedFilePath, setSeedFilePath] = useState<string | null>(
     () => parseViewUrl().filePath,
   )
+  const [commitsScrolled, setCommitsScrolled] = useState(false)
   const hydrated = useRef(false)
   const configSaveGen = useRef(0)
   const preferShaRef = useRef<string | null>(parseViewUrl().commitSha)
@@ -324,6 +325,10 @@ export default function App() {
       document.title = 'Branch Review'
     }
   }, [repos, repoPath, reviewDraft])
+
+  useEffect(() => {
+    setCommitsScrolled(false)
+  }, [commits, repoPath, commitsCollapsed])
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
@@ -641,10 +646,17 @@ export default function App() {
               <p className="empty">No commits ahead of the base branch.</p>
             ) : (
               <>
-                <div className="commit-list-count">
+                <div
+                  className={`commit-list-count${commitsScrolled ? ' is-scrolled' : ''}`}
+                >
                   {commits.length} {commits.length === 1 ? 'commit' : 'commits'}
                 </div>
-                <div className="commit-list-scroll">
+                <div
+                  className="commit-list-scroll"
+                  onScroll={(e) => {
+                    setCommitsScrolled(e.currentTarget.scrollTop > 0)
+                  }}
+                >
                   <ol>
                     {commits.map((c, i) => (
                       <li key={c.sha}>

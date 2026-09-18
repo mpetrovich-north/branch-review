@@ -466,13 +466,24 @@ pre,
 
 .commit-list-count {
   flex: 0 0 auto;
-  padding: 0.45rem 0.85rem 0.25rem;
+  position: relative;
+  z-index: 2;
+  padding: 0.45rem 0.85rem;
   font-family: var(--mono);
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
+  background: var(--sidebar);
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  box-shadow: none;
+  transition: box-shadow 0.15s ease;
+}
+
+.commit-list-count.is-scrolled {
+  box-shadow: 0 6px 10px -6px color-mix(in srgb, var(--text) 32%, transparent);
 }
 
 .commit-list-body {
@@ -528,10 +539,6 @@ pre,
   gap: 0.1rem 0.5rem;
   cursor: pointer;
   color: color-mix(in srgb, var(--text) 72%, var(--muted));
-}
-
-.commit-list-body li:first-child button {
-  border-top-color: var(--border);
 }
 
 .commit-list-body button:hover {
