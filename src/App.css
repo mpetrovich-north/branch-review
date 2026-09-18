@@ -474,7 +474,6 @@ pre,
   border: 0;
   border-top: 1px solid transparent;
   border-bottom: 1px solid var(--border);
-  border-right: 1px solid transparent;
   background: transparent;
   padding: 0.55rem 0.85rem;
   display: grid;
@@ -497,7 +496,6 @@ pre,
 .commit-list-body button.active {
   background: var(--surface);
   color: var(--text);
-  border-right-color: transparent;
   box-shadow: none;
   z-index: 2;
 }
