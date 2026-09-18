@@ -389,7 +389,7 @@ pre,
 
 .diff-line {
   display: grid;
-  grid-template-columns: 3rem 3rem 1fr;
+  grid-template-columns: 3rem 3rem 1.25rem minmax(0, 1fr);
   border-bottom: 1px solid #eff2f5;
 }
 
@@ -402,10 +402,25 @@ pre,
   background: #f6f8fa;
 }
 
+.diff-line .gutter.sign {
+  text-align: center;
+  padding: 0.1rem 0;
+  font-family: var(--mono);
+  border-right: 1px solid #eff2f5;
+}
+
 .diff-line.added {
   background: var(--added-bg);
 }
+.diff-line.added .gutter.sign {
+  color: #1a7f37;
+  background: var(--added-bg);
+}
 .diff-line.removed {
+  background: var(--removed-bg);
+}
+.diff-line.removed .gutter.sign {
+  color: var(--danger);
   background: var(--removed-bg);
 }
 .diff-line.meta {
@@ -414,8 +429,8 @@ pre,
 }
 
 .line-body {
-  display: flex;
-  gap: 0.35rem;
+  display: block;
+  width: 100%;
   border: 0;
   background: transparent;
   text-align: left;
@@ -433,16 +448,13 @@ pre,
   outline-offset: -1px;
 }
 
-.line-body .prefix {
-  color: var(--muted);
-  user-select: none;
-}
-
-.line-body pre {
+.line-code {
   margin: 0;
   white-space: pre;
   overflow: visible;
+  font-family: var(--mono);
 }
+
 
 .comment-thread {
   background: var(--comment-bg);
@@ -454,7 +466,7 @@ pre,
 
 .comment-thread.inline,
 .comment-draft.inline {
-  margin: 0 0 0.35rem 6rem;
+  margin: 0 0 0.35rem 7.25rem;
 }
 
 .comment-thread p {

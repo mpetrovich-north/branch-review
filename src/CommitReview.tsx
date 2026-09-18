@@ -214,7 +214,8 @@ export function CommitReview({ commit, files, comments, onCommentsChange }: Prop
                       <div key={idx} className="diff-line meta">
                         <span className="gutter" />
                         <span className="gutter" />
-                        <pre>{line.content}</pre>
+                        <span className="gutter sign" />
+                        <pre className="line-code">{line.content}</pre>
                       </div>
                     )
                   }
@@ -224,12 +225,17 @@ export function CommitReview({ commit, files, comments, onCommentsChange }: Prop
                     matchesLineComment(c, activeFile.path, line),
                   )
                   const canComment = lineNo !== null
+                  const sign =
+                    line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '
 
                   return (
                     <div key={idx} className="diff-line-block">
                       <div className={`diff-line ${line.type}`}>
                         <span className="gutter">{line.oldLine ?? ''}</span>
                         <span className="gutter">{line.newLine ?? ''}</span>
+                        <span className="gutter sign" aria-hidden="true">
+                          {sign}
+                        </span>
                         <button
                           type="button"
                           className="line-body"
@@ -246,10 +252,7 @@ export function CommitReview({ commit, files, comments, onCommentsChange }: Prop
                             setBody('')
                           }}
                         >
-                          <span className="prefix">
-                            {line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '}
-                          </span>
-                          <pre>{line.content || ' '}</pre>
+                          <pre className="line-code">{line.content || ' '}</pre>
                         </button>
                       </div>
                       {related.map((c) => (
