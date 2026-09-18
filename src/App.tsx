@@ -279,7 +279,6 @@ export default function App() {
   const ready = configIsReady(meta?.config ?? null)
   const selected = commits.find((c) => c.sha === selectedSha) ?? null
   const selectedIndex = selected ? commits.findIndex((c) => c.sha === selected.sha) : -1
-  const reviewBranch = meta?.config?.reviewBranch
 
   return (
     <div className="app-shell">
@@ -354,11 +353,6 @@ export default function App() {
               <h2>
                 {commits.length} {commits.length === 1 ? 'commit' : 'commits'}
               </h2>
-              <p className="commit-list-range muted">
-                {reviewBranch}
-                <span className="sep">vs</span>
-                {meta.config?.baseBranch}
-              </p>
             </div>
             <div className="commit-list-body">
               {commits.length === 0 ? (
