@@ -173,8 +173,9 @@ pre,
 .commit-list-header {
   flex: 0 0 auto;
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
   padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--border);
 }
@@ -182,6 +183,16 @@ pre,
 .commit-list-header h2 {
   margin: 0;
   font-size: 0.95rem;
+}
+
+.commit-list-range {
+  margin: 0;
+  font-size: 0.75rem;
+  word-break: break-all;
+}
+
+.commit-list-range .sep {
+  margin: 0 0.3rem;
 }
 
 .commit-list-body {

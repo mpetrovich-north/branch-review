@@ -220,12 +220,6 @@ export default function App() {
   const selected = commits.find((c) => c.sha === selectedSha) ?? null
   const selectedIndex = selected ? commits.findIndex((c) => c.sha === selected.sha) : -1
   const reviewBranch = meta.config?.reviewBranch
-  const checkedOutNote =
-    meta.checkedOutBranch == null
-      ? 'checked out: detached'
-      : meta.checkedOutBranch === reviewBranch
-        ? `checked out: ${meta.checkedOutBranch}`
-        : `checked out: ${meta.checkedOutBranch} (unchanged)`
 
   return (
     <div className="app-shell">
@@ -234,8 +228,6 @@ export default function App() {
           <h1>Commit review</h1>
           <p className="meta">
             <span title={meta.repoPath}>{meta.repoPath}</span>
-            <span className="sep">·</span>
-            <span>{checkedOutNote}</span>
             {savingConfig ? (
               <>
                 <span className="sep">·</span>
@@ -290,10 +282,14 @@ export default function App() {
         <div className="main-layout">
           <aside className="commit-list">
             <div className="commit-list-header">
-              <h2>Commits</h2>
-              <span className="muted">
-                {commits.length} on {reviewBranch} vs {meta.config?.baseBranch}
-              </span>
+              <h2>
+                {commits.length} {commits.length === 1 ? 'commit' : 'commits'}
+              </h2>
+              <p className="commit-list-range muted">
+                {reviewBranch}
+                <span className="sep">vs</span>
+                {meta.config?.baseBranch}
+              </p>
             </div>
             <div className="commit-list-body">
               {commits.length === 0 ? (
