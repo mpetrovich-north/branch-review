@@ -12,6 +12,8 @@ import {
   setActiveRepoPath,
 } from './api'
 import { CommitReview } from './CommitReview'
+import { MoonIcon, SunIcon } from './icons'
+import { effectiveTheme, toggleStoredTheme, type ThemePreference } from './theme'
 import type {
   BaseSuggestion,
   Comment,
@@ -64,6 +66,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [savingConfig, setSavingConfig] = useState(false)
   const [commitsCollapsed, setCommitsCollapsed] = useState(false)
+  const [theme, setTheme] = useState<ThemePreference>(() => effectiveTheme())
   const hydrated = useRef(false)
 
   const loadReviewData = useCallback(async () => {
@@ -189,6 +192,13 @@ export default function App() {
       window.clearTimeout(handle)
     }
   }, [reviewDraft, baseDraft, meta, loadReviewData, repoPath])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const sync = () => setTheme(effectiveTheme())
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
 
   useEffect(() => {
     if (!selectedSha) {
@@ -420,6 +430,16 @@ export default function App() {
           )}
         </main>
       </div>
+
+      <button
+        type="button"
+        className="theme-toggle"
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        onClick={() => setTheme(toggleStoredTheme())}
+      >
+        {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+      </button>
     </div>
   )
 }
