@@ -284,12 +284,6 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div>
-          <h1>Commit review</h1>
-          <p className="meta">
-            {savingConfig ? <span>Updating…</span> : <span title={repoPath}>{repoPath}</span>}
-          </p>
-        </div>
         <div className="branch-controls">
           <div className="field">
             <label htmlFor="repo-path">Repo</label>
@@ -301,7 +295,7 @@ export default function App() {
               }}
             >
               {repos.map((r) => (
-                <option key={r.path} value={r.path}>
+                <option key={r.path} value={r.path} title={r.path}>
                   {r.name}
                 </option>
               ))}
@@ -326,7 +320,7 @@ export default function App() {
             </select>
           </div>
           <div className="field">
-            <label htmlFor="base-branch">Base branch</label>
+            <label htmlFor="base-branch">Compare to</label>
             <select
               id="base-branch"
               value={baseDraft}
@@ -343,6 +337,7 @@ export default function App() {
               ))}
             </select>
           </div>
+          {savingConfig ? <span className="muted updating-label">Updating…</span> : null}
         </div>
       </header>
 
@@ -350,7 +345,7 @@ export default function App() {
 
       {!meta || !ready ? (
         <p className="muted setup-wait">
-          {meta ? 'Choose review and base branches to start.' : 'Loading repository…'}
+          {meta ? 'Choose review and compare branches to start.' : 'Loading repository…'}
         </p>
       ) : (
         <div className="main-layout">
@@ -390,39 +385,22 @@ export default function App() {
 
           <main className="main-pane">
             {selected ? (
-              <>
-                <div className="commit-nav">
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    disabled={selectedIndex <= 0}
-                    onClick={() => setSelectedSha(commits[selectedIndex - 1]!.sha)}
-                  >
-                    Previous
-                  </button>
-                  <span className="muted">
-                    {selectedIndex + 1} / {commits.length}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    disabled={selectedIndex < 0 || selectedIndex >= commits.length - 1}
-                    onClick={() => setSelectedSha(commits[selectedIndex + 1]!.sha)}
-                  >
-                    Next
-                  </button>
-                </div>
-                {diffLoading ? (
-                  <p className="muted">Loading diff…</p>
-                ) : (
-                  <CommitReview
-                    commit={selected}
-                    files={files}
-                    comments={comments}
-                    onCommentsChange={setComments}
-                  />
-                )}
-              </>
+              diffLoading ? (
+                <p className="muted">Loading diff…</p>
+              ) : (
+                <CommitReview
+                  commit={selected}
+                  files={files}
+                  comments={comments}
+                  onCommentsChange={setComments}
+                  nav={{
+                    index: selectedIndex,
+                    total: commits.length,
+                    onPrev: () => setSelectedSha(commits[selectedIndex - 1]!.sha),
+                    onNext: () => setSelectedSha(commits[selectedIndex + 1]!.sha),
+                  }}
+                />
+              )
             ) : (
               <p className="empty">Select a commit to review.</p>
             )}

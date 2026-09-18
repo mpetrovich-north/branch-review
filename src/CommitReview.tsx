@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Comment, CommitSummary, DiffFile, LineComment, LineType } from './types'
 import { createComment, removeComment } from './api'
 
@@ -7,6 +7,12 @@ type Props = {
   files: DiffFile[]
   comments: Comment[]
   onCommentsChange: (comments: Comment[]) => void
+  nav: {
+    index: number
+    total: number
+    onPrev: () => void
+    onNext: () => void
+  }
 }
 
 function lineNumberFor(line: DiffFile['lines'][number]): number | null {
@@ -26,7 +32,45 @@ function matchesLineComment(
   return n !== null && n === comment.line
 }
 
-export function CommitReview({ commit, files, comments, onCommentsChange }: Props) {
+function formatCommitTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZoneName: 'short',
+  })
+}
+
+function CommentBubbleIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M2.5 2.75h11a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H7.2L4 14.25v-2.999H2.5a1 1 0 0 1-1-1v-6.5a1 1 0 0 1 1-1Z"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+export function CommitReview({
+  commit,
+  files,
+  comments,
+  onCommentsChange,
+  nav,
+}: Props) {
   const [activePath, setActivePath] = useState(files[0]?.path ?? '')
   const [draftLine, setDraftLine] = useState<{
     path: string
@@ -38,16 +82,13 @@ export function CommitReview({ commit, files, comments, onCommentsChange }: Prop
   const [body, setBody] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const diffPaneRef = useRef<HTMLDivElement>(null)
 
   function selectFile(path: string) {
     setActivePath(path)
     setDraftLine(null)
     setDraftMessage(false)
     setBody('')
-    requestAnimationFrame(() => {
-      diffPaneRef.current?.scrollIntoView({ block: 'start' })
-    })
+    window.scrollTo({ top: 0, behavior: 'auto' })
   }
 
   useEffect(() => {
@@ -133,59 +174,105 @@ export function CommitReview({ commit, files, comments, onCommentsChange }: Prop
     <div className="commit-review">
       <section className="commit-message-panel">
         <div className="commit-message-header">
-          <div>
-            <code className="sha">{commit.shortSha}</code>
+          <div className="commit-title-block">
             <h2>{commit.subject}</h2>
             <p className="meta">
-              {commit.authorName} · {new Date(commit.authoredAt).toLocaleString()}
+              <code className="sha">{commit.shortSha}</code>
+              <span className="sep">·</span>
+              {commit.authorName}
+              <span className="sep">·</span>
+              {formatCommitTime(commit.authoredAt)}
             </p>
           </div>
+          <div className="commit-nav">
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={nav.index <= 0}
+              onClick={nav.onPrev}
+            >
+              Previous
+            </button>
+            <span className="muted">
+              {nav.index + 1} / {nav.total}
+            </span>
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={nav.index < 0 || nav.index >= nav.total - 1}
+              onClick={nav.onNext}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+
+        <div className="commit-message-row">
           <button
             type="button"
-            className="btn ghost"
+            className="comment-bubble"
+            title="Comment on commit message"
+            aria-label="Comment on commit message"
             onClick={() => {
               setDraftMessage(true)
               setDraftLine(null)
               setBody('')
             }}
           >
-            Comment on message
+            <CommentBubbleIcon />
           </button>
+          <div className="commit-message-content">
+            {commit.body ? (
+              <pre className="commit-body">{commit.body}</pre>
+            ) : (
+              <p className="muted commit-body-empty">No message body</p>
+            )}
+            {commitMessageComments.map((c) => (
+              <div key={c.id} className="comment-thread">
+                <p>{c.body}</p>
+                <button
+                  type="button"
+                  className="btn link"
+                  disabled={busy}
+                  onClick={() => onDelete(c.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+            {draftMessage ? (
+              <div className="comment-draft">
+                <textarea
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder="Comment on this commit message"
+                  rows={3}
+                  autoFocus
+                />
+                <div className="draft-actions">
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={busy}
+                    onClick={submitCommitMessage}
+                  >
+                    Save comment
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => {
+                      setDraftMessage(false)
+                      setBody('')
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
-        {commit.body ? <pre className="commit-body">{commit.body}</pre> : null}
-        {commitMessageComments.map((c) => (
-          <div key={c.id} className="comment-thread">
-            <p>{c.body}</p>
-            <button type="button" className="btn link" disabled={busy} onClick={() => onDelete(c.id)}>
-              Delete
-            </button>
-          </div>
-        ))}
-        {draftMessage ? (
-          <div className="comment-draft">
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Comment on this commit message"
-              rows={3}
-            />
-            <div className="draft-actions">
-              <button type="button" className="btn" disabled={busy} onClick={submitCommitMessage}>
-                Save comment
-              </button>
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => {
-                  setDraftMessage(false)
-                  setBody('')
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : null}
       </section>
 
       <div className="diff-layout">
@@ -211,7 +298,7 @@ export function CommitReview({ commit, files, comments, onCommentsChange }: Prop
           </ul>
         </aside>
 
-        <div className="diff-pane" ref={diffPaneRef}>
+        <div className="diff-pane">
           {activeFile ? (
             <>
               <div className="diff-file-header">
@@ -292,7 +379,12 @@ export function CommitReview({ commit, files, comments, onCommentsChange }: Prop
                             autoFocus
                           />
                           <div className="draft-actions">
-                            <button type="button" className="btn" disabled={busy} onClick={submitLine}>
+                            <button
+                              type="button"
+                              className="btn"
+                              disabled={busy}
+                              onClick={submitLine}
+                            >
                               Save comment
                             </button>
                             <button

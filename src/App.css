@@ -57,10 +57,9 @@ pre,
   top: 0;
   z-index: 20;
   display: flex;
-  justify-content: space-between;
-  gap: 1.5rem;
+  justify-content: flex-start;
   align-items: flex-end;
-  padding: 1rem 1.25rem;
+  padding: 0.85rem 1.25rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
@@ -69,6 +68,12 @@ pre,
   margin: 0;
   font-size: 1.15rem;
   font-weight: 600;
+}
+
+.updating-label {
+  align-self: center;
+  font-size: 0.85rem;
+  padding-bottom: 0.15rem;
 }
 
 .meta {
@@ -252,7 +257,7 @@ pre,
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  flex-shrink: 0;
 }
 
 .commit-message-panel {
@@ -270,15 +275,64 @@ pre,
   align-items: flex-start;
 }
 
+.commit-title-block {
+  min-width: 0;
+  flex: 1;
+}
+
 .commit-message-header h2 {
-  margin: 0.25rem 0;
+  margin: 0;
   font-size: 1.1rem;
 }
 
-.commit-body {
-  margin: 0.75rem 0 0;
-  white-space: pre-wrap;
+.commit-title-block .meta {
+  margin: 0.35rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0;
+}
+
+.commit-message-row {
+  display: grid;
+  grid-template-columns: 1.75rem 1fr;
+  gap: 0.55rem;
+  align-items: start;
+  margin-top: 0.85rem;
+}
+
+.comment-bubble {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
   color: var(--muted);
+  cursor: pointer;
+}
+
+.comment-bubble:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.commit-message-content {
+  min-width: 0;
+}
+
+.commit-body {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.commit-body-empty {
+  margin: 0;
   font-size: 0.9rem;
 }
 
@@ -378,7 +432,6 @@ pre,
   border-radius: 8px;
   overflow: visible;
   min-width: 0;
-  scroll-margin-top: var(--topbar-offset);
 }
 
 .diff-file-header {
