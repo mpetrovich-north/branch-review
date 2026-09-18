@@ -63,6 +63,7 @@ export default function App() {
   const [diffLoading, setDiffLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savingConfig, setSavingConfig] = useState(false)
+  const [commitsCollapsed, setCommitsCollapsed] = useState(false)
   const hydrated = useRef(false)
 
   const loadReviewData = useCallback(async () => {
@@ -347,14 +348,45 @@ export default function App() {
           {meta ? 'Choose review and compare branches to start.' : 'Loading repository…'}
         </p>
       ) : (
-        <div className="main-layout">
-          <aside className="commit-list">
+        <div className={`main-layout${commitsCollapsed ? ' commits-collapsed' : ''}`}>
+          <aside className={`commit-list${commitsCollapsed ? ' is-collapsed' : ''}`}>
             <div className="commit-list-header">
-              <h2>
-                {commits.length} {commits.length === 1 ? 'commit' : 'commits'}
-              </h2>
+              {commitsCollapsed ? (
+                <button
+                  type="button"
+                  className="commit-list-toggle"
+                  aria-expanded={false}
+                  aria-controls="commit-list-body"
+                  title="Show commits"
+                  onClick={() => setCommitsCollapsed(false)}
+                >
+                  <span className="commit-list-toggle-icon" aria-hidden="true">
+                    ›
+                  </span>
+                  <span className="visually-hidden">Show commits</span>
+                </button>
+              ) : (
+                <>
+                  <h2>
+                    {commits.length} {commits.length === 1 ? 'commit' : 'commits'}
+                  </h2>
+                  <button
+                    type="button"
+                    className="commit-list-toggle"
+                    aria-expanded={true}
+                    aria-controls="commit-list-body"
+                    title="Hide commits"
+                    onClick={() => setCommitsCollapsed(true)}
+                  >
+                    <span className="commit-list-toggle-icon" aria-hidden="true">
+                      ‹
+                    </span>
+                    <span className="visually-hidden">Hide commits</span>
+                  </button>
+                </>
+              )}
             </div>
-            <div className="commit-list-body">
+            <div id="commit-list-body" className="commit-list-body" hidden={commitsCollapsed}>
               {commits.length === 0 ? (
                 <p className="empty">No commits ahead of the base branch.</p>
               ) : (

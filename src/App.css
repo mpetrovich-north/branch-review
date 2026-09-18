@@ -161,6 +161,10 @@ pre,
   min-height: 0;
 }
 
+.main-layout.commits-collapsed {
+  grid-template-columns: 2.5rem 1fr;
+}
+
 .commit-list {
   position: sticky;
   top: var(--topbar-offset);
@@ -176,8 +180,13 @@ pre,
 
 .commit-list-header {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
   padding: 0.55rem 0.65rem;
   border-bottom: 1px solid var(--border);
+  min-height: 2.4rem;
 }
 
 .commit-list-header h2 {
@@ -188,10 +197,59 @@ pre,
   min-width: 0;
 }
 
+.commit-list-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.commit-list-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.commit-list-toggle-icon {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.commit-list.is-collapsed .commit-list-header {
+  justify-content: center;
+  padding: 0.55rem 0.25rem;
+  border-bottom: 0;
+}
+
 .commit-list-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
+}
+
+.commit-list-body[hidden] {
+  display: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .commit-list ol {
@@ -200,7 +258,7 @@ pre,
   padding: 0;
 }
 
-.commit-list button {
+.commit-list-body button {
   width: 100%;
   text-align: left;
   border: 0;
@@ -215,18 +273,18 @@ pre,
   color: var(--muted);
 }
 
-.commit-list button:hover {
+.commit-list-body button:hover {
   background: color-mix(in srgb, var(--surface) 55%, transparent);
   color: var(--text);
 }
 
-.commit-list button.active {
+.commit-list-body button.active {
   background: var(--surface);
   color: var(--text);
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
-.commit-list button.active .subject {
+.commit-list-body button.active .subject {
   color: var(--text);
 }
 
@@ -621,5 +679,14 @@ pre,
   .commit-list {
     border-right: 0;
     border-bottom: 1px solid var(--border);
+  }
+
+  .main-layout.commits-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .commit-list.is-collapsed {
+    max-height: none;
+    height: auto;
   }
 }
