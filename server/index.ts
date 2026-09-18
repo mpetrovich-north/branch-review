@@ -25,13 +25,15 @@ import {
 } from './review-store.js'
 import {
   assertAllowedRepo,
+  assertScanRoot,
   listRepos,
   parsePreferredRepo,
   parseRepoRoots,
 } from './repos.js'
+import { pickDirectory } from './pick-directory.js'
 import { configSchema } from './schema.js'
 
-const roots = parseRepoRoots()
+let roots = parseRepoRoots()
 const preferredRepo = parsePreferredRepo()
 const port = Number(process.env.PORT ?? 8787)
 
@@ -74,24 +76,58 @@ app.get(
   }),
 )
 
+async function respondWithRepos(
+  res: express.Response,
+  extra: Record<string, unknown> = {},
+): Promise<void> {
+  const repos = await listRepos(roots)
+  if (preferredRepo) {
+    try {
+      await assertGitRepo(preferredRepo)
+      if (!repos.some((r) => r.path === preferredRepo)) {
+        repos.unshift({
+          path: preferredRepo,
+          name: path.basename(preferredRepo),
+        })
+      }
+    } catch {
+      // preferred path is not a git repo; ignore
+    }
+  }
+  res.json({ roots, preferredRepo, repos, ...extra })
+}
+
 app.get(
   '/api/repos',
   asyncHandler(async (_req, res) => {
-    const repos = await listRepos(roots)
-    if (preferredRepo) {
-      try {
-        await assertGitRepo(preferredRepo)
-        if (!repos.some((r) => r.path === preferredRepo)) {
-          repos.unshift({
-            path: preferredRepo,
-            name: path.basename(preferredRepo),
-          })
-        }
-      } catch {
-        // preferred path is not a git repo; ignore
-      }
+    await respondWithRepos(res)
+  }),
+)
+
+app.put(
+  '/api/repo-roots',
+  asyncHandler(async (req, res) => {
+    const raw = req.body?.roots
+    if (!Array.isArray(raw) || raw.length === 0 || raw.some((r) => typeof r !== 'string')) {
+      throw Object.assign(new Error('body.roots must be a non-empty string array'), {
+        status: 400,
+      })
     }
-    res.json({ roots, preferredRepo, repos })
+    roots = await Promise.all(raw.map((r) => assertScanRoot(String(r))))
+    await respondWithRepos(res)
+  }),
+)
+
+app.post(
+  '/api/repo-roots/pick',
+  asyncHandler(async (_req, res) => {
+    const chosen = await pickDirectory('Choose a folder to scan for git repositories')
+    if (!chosen) {
+      await respondWithRepos(res, { cancelled: true })
+      return
+    }
+    roots = [await assertScanRoot(chosen)]
+    await respondWithRepos(res, { cancelled: false })
   }),
 )
 

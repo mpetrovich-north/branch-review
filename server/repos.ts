@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { readdir, access } from 'node:fs/promises'
+import { access, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { assertGitRepo } from './git.js'
 
@@ -43,6 +43,20 @@ export function parseRepoRoots(): string[] {
       .filter(Boolean)
   }
   return [defaultRepoRoot()]
+}
+
+export async function assertScanRoot(dir: string): Promise<string> {
+  const resolved = path.resolve(dir)
+  let info
+  try {
+    info = await stat(resolved)
+  } catch {
+    throw new Error(`Directory does not exist: ${resolved}`)
+  }
+  if (!info.isDirectory()) {
+    throw new Error(`Not a directory: ${resolved}`)
+  }
+  return resolved
 }
 
 async function isGitWorkTree(dir: string): Promise<boolean> {
