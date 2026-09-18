@@ -15,12 +15,19 @@ export function parsePreferredRepo(): string | null {
   return raw ? path.resolve(raw) : null
 }
 
-/** Parent of a repo, or cwd when cwd is not itself a git work tree. */
+/** Directory used to infer the default scan root (caller cwd, not the app install dir). */
+function inferenceCwd(): string {
+  return path.resolve(
+    process.env.COMMIT_REVIEW_CWD ?? process.env.INIT_CWD ?? process.cwd(),
+  )
+}
+
+/** Parent of a repo, or inference cwd when that path is not itself a git work tree. */
 export function defaultRepoRoot(): string {
   const preferred = parsePreferredRepo()
   if (preferred) return path.dirname(preferred)
 
-  const cwd = process.cwd()
+  const cwd = inferenceCwd()
   if (existsSync(path.join(cwd, '.git'))) {
     return path.dirname(cwd)
   }

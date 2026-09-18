@@ -7,6 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
 const preferred = process.argv[2] ? path.resolve(process.argv[2]) : undefined
 const port = process.env.PORT ?? '8787'
+const callerCwd = process.cwd()
 
 const child = spawn(
   process.execPath,
@@ -17,6 +18,7 @@ const child = spawn(
     env: {
       ...process.env,
       PORT: port,
+      COMMIT_REVIEW_CWD: process.env.COMMIT_REVIEW_CWD ?? callerCwd,
       ...(preferred ? { REPO_PATH: preferred } : {}),
       NODE_ENV: process.env.NODE_ENV ?? 'production',
     },
