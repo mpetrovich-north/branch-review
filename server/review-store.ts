@@ -6,6 +6,7 @@ import {
   configSchema,
   createCommentSchema,
   storedConfigSchema,
+  updateCommentSchema,
   type Comment,
   type CommentsFile,
   type ReviewConfig,
@@ -137,10 +138,19 @@ export async function addComment(
     if (snippet !== undefined) {
       comment.snippet = snippet
     }
+  } else if (data.kind === 'file') {
+    comment = {
+      id: ulid(),
+      kind: 'file',
+      commitSha: data.commitSha,
+      path: data.path,
+      body: data.body,
+      createdAt: new Date().toISOString(),
+    }
   } else {
     comment = {
       id: ulid(),
-      kind: 'commit_message',
+      kind: 'commit',
       commitSha: data.commitSha,
       body: data.body,
       createdAt: new Date().toISOString(),
@@ -150,6 +160,26 @@ export async function addComment(
   file.baseBranch = baseBranch
   file.branch = branch
   file.comments.push(comment)
+  return writeCommentsFile(repoPath, file)
+}
+
+export async function updateComment(
+  repoPath: string,
+  branch: string,
+  baseBranch: string,
+  commentId: string,
+  input: unknown,
+): Promise<CommentsFile> {
+  const data = updateCommentSchema.parse(input)
+  const file = await readComments(repoPath, branch, baseBranch)
+  const index = file.comments.findIndex((c) => c.id === commentId)
+  if (index === -1) {
+    throw Object.assign(new Error(`Comment not found: ${commentId}`), { status: 404 })
+  }
+  const existing = file.comments[index]!
+  file.comments[index] = { ...existing, body: data.body }
+  file.baseBranch = baseBranch
+  file.branch = branch
   return writeCommentsFile(repoPath, file)
 }
 

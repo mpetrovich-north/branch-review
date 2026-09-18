@@ -12,15 +12,24 @@ export type LineComment = {
   createdAt: string
 }
 
-export type CommitMessageComment = {
+export type FileComment = {
   id: string
-  kind: 'commit_message'
+  kind: 'file'
+  commitSha: string
+  path: string
+  body: string
+  createdAt: string
+}
+
+export type CommitComment = {
+  id: string
+  kind: 'commit'
   commitSha: string
   body: string
   createdAt: string
 }
 
-export type Comment = LineComment | CommitMessageComment
+export type Comment = LineComment | FileComment | CommitComment
 
 export type CommentsFile = {
   version: 1
@@ -84,4 +93,3 @@ export type MetaResponse = {
   defaultReviewBranch: string | null
   suggestedBase: BaseSuggestion | null
 }
-

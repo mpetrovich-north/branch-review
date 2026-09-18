@@ -19,6 +19,7 @@ import {
   isConfigReady,
   readComments,
   readConfig,
+  updateComment,
   writeConfig,
 } from './review-store.js'
 import {
@@ -224,6 +225,26 @@ app.post(
     }
     const file = await addComment(repoPath, config.reviewBranch, config.baseBranch, req.body)
     res.status(201).json(file)
+  }),
+)
+
+app.patch(
+  '/api/comments/:id',
+  asyncHandler(async (req, res) => {
+    const repoPath = await resolveRepo(req)
+    const config = await readConfig(repoPath)
+    if (!isConfigReady(config)) {
+      res.status(400).json({ error: 'Set reviewBranch and baseBranch in config first' })
+      return
+    }
+    const file = await updateComment(
+      repoPath,
+      config.reviewBranch,
+      config.baseBranch,
+      String(req.params.id),
+      req.body,
+    )
+    res.json(file)
   }),
 )
 

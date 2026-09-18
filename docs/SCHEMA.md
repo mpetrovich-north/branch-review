@@ -49,16 +49,31 @@
 | `unchanged` | New file (post-image) |
 | `removed` | Old file (pre-image) |
 
-### Commit message comment
+### File comment
 
 ```json
 {
-  "id": "cmt_01HZY...",
-  "kind": "commit_message",
+  "id": "cmt_01HZZ...",
+  "kind": "file",
   "commitSha": "abc1234def5678...",
-  "body": "Subject should say why, not what.",
+  "path": "src/foo.ts",
+  "body": "This file should not own this responsibility.",
   "createdAt": "2026-09-17T20:02:00.000Z"
 }
 ```
 
-No `path`, `line`, `lineType`, or `snippet` on commit message comments.
+No `line`, `lineType`, or `snippet` on file comments.
+
+### Commit comment
+
+```json
+{
+  "id": "cmt_01HZY...",
+  "kind": "commit",
+  "commitSha": "abc1234def5678...",
+  "body": "Subject should say why, not what.",
+  "createdAt": "2026-09-17T20:03:00.000Z"
+}
+```
+
+No `path`, `line`, `lineType`, or `snippet` on commit comments.

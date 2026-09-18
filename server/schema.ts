@@ -14,9 +14,18 @@ export const lineCommentSchema = z.object({
   createdAt: z.string().datetime(),
 })
 
-export const commitMessageCommentSchema = z.object({
+export const fileCommentSchema = z.object({
   id: z.string().min(1),
-  kind: z.literal('commit_message'),
+  kind: z.literal('file'),
+  commitSha: z.string().min(1),
+  path: z.string().min(1),
+  body: z.string().min(1),
+  createdAt: z.string().datetime(),
+})
+
+export const commitCommentSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal('commit'),
   commitSha: z.string().min(1),
   body: z.string().min(1),
   createdAt: z.string().datetime(),
@@ -24,7 +33,8 @@ export const commitMessageCommentSchema = z.object({
 
 export const commentSchema = z.discriminatedUnion('kind', [
   lineCommentSchema,
-  commitMessageCommentSchema,
+  fileCommentSchema,
+  commitCommentSchema,
 ])
 
 export const commentsFileSchema = z.object({
@@ -56,16 +66,28 @@ export const createLineCommentSchema = z.object({
   body: z.string().min(1),
 })
 
-export const createCommitMessageCommentSchema = z.object({
-  kind: z.literal('commit_message'),
+export const createFileCommentSchema = z.object({
+  kind: z.literal('file'),
+  commitSha: z.string().min(1),
+  path: z.string().min(1),
+  body: z.string().min(1),
+})
+
+export const createCommitCommentSchema = z.object({
+  kind: z.literal('commit'),
   commitSha: z.string().min(1),
   body: z.string().min(1),
 })
 
 export const createCommentSchema = z.discriminatedUnion('kind', [
   createLineCommentSchema,
-  createCommitMessageCommentSchema,
+  createFileCommentSchema,
+  createCommitCommentSchema,
 ])
+
+export const updateCommentSchema = z.object({
+  body: z.string().min(1),
+})
 
 export type Comment = z.infer<typeof commentSchema>
 export type CommentsFile = z.infer<typeof commentsFileSchema>

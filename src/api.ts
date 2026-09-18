@@ -108,6 +108,13 @@ export function createComment(body: unknown) {
   })
 }
 
+export function updateComment(id: string, body: string) {
+  return request<CommentsFile>(`/api/comments/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ body }),
+  })
+}
+
 export function removeComment(id: string) {
   return request<CommentsFile>(`/api/comments/${id}`, { method: 'DELETE' })
 }
