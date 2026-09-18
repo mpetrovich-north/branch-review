@@ -32,7 +32,7 @@ import {
   TrashIcon,
 } from './icons'
 
-function isCommentSaveShortcut(e: { key: string; metaKey: boolean; ctrlKey: boolean }): boolean {
+function isSaveShortcut(e: { key: string; metaKey: boolean; ctrlKey: boolean }): boolean {
   return e.key === 'Enter' && (e.metaKey || e.ctrlKey)
 }
 
@@ -190,10 +190,16 @@ function EditableCommitText({
     setEditing(false)
   }
 
-function beginEdit() {
+  function beginEdit() {
     if (busy) return
     setDraft(display)
     setEditing(true)
+  }
+
+  function onEditorKeyDown(e: { key: string; metaKey: boolean; ctrlKey: boolean; preventDefault: () => void }) {
+    if (!isSaveShortcut(e)) return
+    e.preventDefault()
+    if (!busy) void save()
   }
 
   return (
@@ -263,6 +269,7 @@ function beginEdit() {
               disabled={busy}
               autoFocus
               aria-label="Commit subject"
+              onKeyDown={onEditorKeyDown}
             />
           ) : (
             <textarea
@@ -273,6 +280,7 @@ function beginEdit() {
               rows={Math.min(12, Math.max(3, draft.split('\n').length + 1))}
               autoFocus
               aria-label="Commit description"
+              onKeyDown={onEditorKeyDown}
             />
           )}
           <DraftActions
@@ -407,7 +415,7 @@ function EditableComment({
             rows={3}
             autoFocus
             onKeyDown={(e) => {
-              if (!isCommentSaveShortcut(e)) return
+              if (!isSaveShortcut(e)) return
               e.preventDefault()
               if (!busy) void save()
             }}
@@ -635,7 +643,7 @@ function FileDiffSection({
               rows={3}
               autoFocus
               onKeyDown={(e) => {
-                if (!isCommentSaveShortcut(e)) return
+                if (!isSaveShortcut(e)) return
                 e.preventDefault()
                 if (!busy) onSubmitFile()
               }}
@@ -711,7 +719,7 @@ function FileDiffSection({
                         rows={3}
                         autoFocus
                         onKeyDown={(e) => {
-                          if (!isCommentSaveShortcut(e)) return
+                          if (!isSaveShortcut(e)) return
                           e.preventDefault()
                           if (!busy) onSubmitLine()
                         }}
@@ -1198,7 +1206,7 @@ export function CommitReview({
                   rows={3}
                   autoFocus
                   onKeyDown={(e) => {
-                    if (!isCommentSaveShortcut(e)) return
+                    if (!isSaveShortcut(e)) return
                     e.preventDefault()
                     if (!busy) void submitCommit()
                   }}
