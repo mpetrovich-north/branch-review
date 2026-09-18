@@ -239,24 +239,44 @@ export function parseUnifiedDiff(diffText: string): DiffFile[] {
   return files
 }
 
-/** Local and remote-tracking branch names (origin/ prefix stripped). */
-export async function listBranches(repoPath: string): Promise<string[]> {
-  const stdout = await git(repoPath, [
+/** Local heads and remote-tracking names (origin/ prefix stripped; remote-only). */
+export type BranchLists = {
+  local: string[]
+  remote: string[]
+}
+
+export async function listBranches(repoPath: string): Promise<BranchLists> {
+  const localOut = await git(repoPath, [
     'for-each-ref',
     '--format=%(refname:short)',
     'refs/heads',
+  ])
+  const remoteOut = await git(repoPath, [
+    'for-each-ref',
+    '--format=%(refname:short)',
     'refs/remotes',
   ])
-  const names = new Set<string>()
-  for (const line of stdout.split('\n')) {
+
+  const local = new Set<string>()
+  for (const line of localOut.split('\n')) {
+    const name = line.trim()
+    if (name) local.add(name)
+  }
+
+  const remote = new Set<string>()
+  for (const line of remoteOut.split('\n')) {
     let name = line.trim()
     if (!name || name.endsWith('/HEAD')) continue
-    if (name.startsWith('origin/')) {
-      name = name.slice('origin/'.length)
-    }
-    if (name) names.add(name)
+    if (name.startsWith('origin/')) name = name.slice('origin/'.length)
+    else if (name.includes('/')) name = name.slice(name.indexOf('/') + 1)
+    if (!name || local.has(name)) continue
+    remote.add(name)
   }
-  return [...names].sort((a, b) => a.localeCompare(b))
+
+  return {
+    local: [...local].sort((a, b) => a.localeCompare(b)),
+    remote: [...remote].sort((a, b) => a.localeCompare(b)),
+  }
 }
 
 export async function detectDefaultBranch(repoPath: string): Promise<string> {

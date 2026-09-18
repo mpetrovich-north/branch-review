@@ -94,7 +94,10 @@ export type MetaResponse = {
   repoPath: string
   checkedOutBranch: string | null
   config: StoredConfig | null
-  branches: string[]
+  branches: {
+    local: string[]
+    remote: string[]
+  }
   defaultBaseBranch: string
   defaultReviewBranch: string | null
   suggestedBase: BaseSuggestion | null

@@ -15,7 +15,6 @@ import { CommitReview } from './CommitReview'
 import { CommitIcon, MoonIcon, SunIcon } from './icons'
 import { effectiveTheme, toggleStoredTheme, type ThemePreference } from './theme'
 import type {
-  BaseSuggestion,
   Comment,
   CommitSummary,
   DiffFile,
@@ -38,6 +37,48 @@ function withBranch(branches: string[], extra: string | null | undefined): strin
   if (!extra) return branches
   if (branches.includes(extra)) return branches
   return [extra, ...branches]
+}
+
+function partitionBranchOptions(
+  lists: { local: string[]; remote: string[] } | undefined,
+  extra: string | null | undefined,
+): { local: string[]; remote: string[] } {
+  const local = [...(lists?.local ?? [])]
+  const remote = (lists?.remote ?? []).filter((b) => !local.includes(b))
+  if (!extra) return { local, remote }
+  if (local.includes(extra) || remote.includes(extra)) return { local, remote }
+  return { local: withBranch(local, extra), remote }
+}
+
+function BranchOptionGroups({
+  local,
+  remote,
+}: {
+  local: string[]
+  remote: string[]
+}) {
+  return (
+    <>
+      {local.length > 0 ? (
+        <optgroup label="Local">
+          {local.map((b) => (
+            <option key={`local:${b}`} value={b}>
+              {b}
+            </option>
+          ))}
+        </optgroup>
+      ) : null}
+      {remote.length > 0 ? (
+        <optgroup label="Remote">
+          {remote.map((b) => (
+            <option key={`remote:${b}`} value={b}>
+              {b}
+            </option>
+          ))}
+        </optgroup>
+      ) : null}
+    </>
+  )
 }
 
 function repoFromQuery(): string | null {
@@ -100,7 +141,6 @@ export default function App() {
   const [meta, setMeta] = useState<MetaResponse | null>(null)
   const [baseDraft, setBaseDraft] = useState('main')
   const [reviewDraft, setReviewDraft] = useState('')
-  const [suggestion, setSuggestion] = useState<BaseSuggestion | null>(null)
   const [commits, setCommits] = useState<CommitSummary[]>([])
   const [selectedSha, setSelectedSha] = useState<string | null>(null)
   const [files, setFiles] = useState<DiffFile[]>([])
@@ -160,7 +200,6 @@ export default function App() {
       if (url.reviewBranch && url.baseBranch) {
         setReviewDraft(url.reviewBranch)
         setBaseDraft(url.baseBranch)
-        setSuggestion(m.suggestedBase)
         preferShaRef.current = url.commitSha
         setSeedFilePath(url.filePath)
         setActiveFilePath(url.filePath)
@@ -173,13 +212,11 @@ export default function App() {
       } else if (configIsReady(m.config)) {
         setReviewDraft(m.config.reviewBranch)
         setBaseDraft(m.config.baseBranch)
-        setSuggestion(m.suggestedBase)
         await loadReviewData()
       } else {
         setReviewDraft(REVIEW_BRANCH_PLACEHOLDER)
         const suggested = m.suggestedBase?.baseBranch ?? m.defaultBaseBranch
         setBaseDraft(suggested)
-        setSuggestion(m.suggestedBase)
       }
       hydrated.current = true
     },
@@ -220,14 +257,13 @@ export default function App() {
       fetchSuggestedBase(reviewDraft.trim())
         .then((res) => {
           if (cancelled) return
-          setSuggestion(res.suggestedBase)
           if (savedReview === reviewDraft.trim()) return
           if (res.suggestedBase) {
             setBaseDraft(res.suggestedBase.baseBranch)
           }
         })
         .catch(() => {
-          /* keep prior suggestion */
+          /* keep prior base */
         })
     }, 200)
     return () => {
@@ -371,28 +407,19 @@ export default function App() {
     }
   }, [selectedSha, repoPath])
 
-  const reviewOptions = useMemo(() => {
-    const branches = meta?.branches ?? []
-    if (!reviewDraft || reviewDraft === REVIEW_BRANCH_PLACEHOLDER) return branches
-    return withBranch(branches, reviewDraft)
-  }, [meta?.branches, reviewDraft])
+  const reviewOptions = useMemo(
+    () =>
+      partitionBranchOptions(
+        meta?.branches,
+        reviewDraft && reviewDraft !== REVIEW_BRANCH_PLACEHOLDER ? reviewDraft : null,
+      ),
+    [meta?.branches, reviewDraft],
+  )
 
-  const baseOptions = useMemo(() => {
-    let list = withBranch(meta?.branches ?? [], baseDraft)
-    if (suggestion?.baseBranch) {
-      list = [suggestion.baseBranch, ...list.filter((b) => b !== suggestion.baseBranch)]
-    }
-    if (meta?.defaultBaseBranch && meta.defaultBaseBranch !== suggestion?.baseBranch) {
-      list = [
-        ...(suggestion?.baseBranch ? [suggestion.baseBranch] : []),
-        meta.defaultBaseBranch,
-        ...list.filter(
-          (b) => b !== suggestion?.baseBranch && b !== meta.defaultBaseBranch,
-        ),
-      ]
-    }
-    return list
-  }, [meta?.branches, meta?.defaultBaseBranch, baseDraft, suggestion?.baseBranch])
+  const baseOptions = useMemo(
+    () => partitionBranchOptions(meta?.branches, baseDraft),
+    [meta?.branches, baseDraft],
+  )
 
   async function onRepoChange(next: string) {
     setLoading(true)
@@ -456,11 +483,7 @@ export default function App() {
               Select branch
             </option>
           ) : null}
-          {reviewOptions.map((b) => (
-            <option key={b} value={b}>
-              {b}
-            </option>
-          ))}
+          <BranchOptionGroups local={reviewOptions.local} remote={reviewOptions.remote} />
         </select>
       </div>
       <div className="field">
@@ -471,14 +494,7 @@ export default function App() {
           onChange={(e) => setBaseDraft(e.target.value)}
           disabled={!meta}
         >
-          {baseDraft && !baseOptions.includes(baseDraft) ? (
-            <option value={baseDraft}>{baseDraft}</option>
-          ) : null}
-          {baseOptions.map((b) => (
-            <option key={b} value={b}>
-              {b}
-            </option>
-          ))}
+          <BranchOptionGroups local={baseOptions.local} remote={baseOptions.remote} />
         </select>
       </div>
       {savingConfig ? <span className="muted updating-label">Updating…</span> : null}
