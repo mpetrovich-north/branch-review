@@ -392,6 +392,13 @@ pre,
   min-height: 2rem;
 }
 
+.commit-list-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
 .commit-list-title {
   margin: 0;
   font-size: 0.95rem;
@@ -399,6 +406,26 @@ pre,
   letter-spacing: -0.01em;
   color: var(--text);
   min-width: 0;
+}
+
+.commit-list-help {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in srgb, var(--muted) 78%, transparent);
+  line-height: 0;
+  text-decoration: none;
+}
+
+.commit-list-help:hover {
+  color: var(--accent);
+}
+
+.commit-list-help-icon {
+  display: block;
+  width: 14px;
+  height: 14px;
 }
 
 .commit-list-toggle {

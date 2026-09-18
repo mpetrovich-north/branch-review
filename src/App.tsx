@@ -535,7 +535,40 @@ export default function App() {
               </button>
             ) : (
               <>
-                <h1 className="commit-list-title">Branch Review</h1>
+                <div className="commit-list-heading">
+                  <h1 className="commit-list-title">Branch Review</h1>
+                  <a
+                    className="commit-list-help"
+                    href="https://github.com/mpetrovich-north/branch-review"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Project on GitHub"
+                  >
+                    <svg
+                      className="commit-list-help-icon"
+                      viewBox="0 0 16 16"
+                      aria-hidden="true"
+                    >
+                      <circle
+                        cx="8"
+                        cy="8"
+                        r="6.25"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.25"
+                      />
+                      <path
+                        d="M6.35 6.2c0-.95.7-1.55 1.65-1.55.95 0 1.65.55 1.65 1.4 0 .7-.4 1.1-.95 1.4-.55.3-.85.55-.85 1.15v.25"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.25"
+                        strokeLinecap="round"
+                      />
+                      <circle cx="8" cy="11.35" r="0.7" fill="currentColor" />
+                    </svg>
+                    <span className="visually-hidden">Project on GitHub</span>
+                  </a>
+                </div>
                 <button
                   type="button"
                   className="commit-list-toggle"
