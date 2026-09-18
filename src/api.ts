@@ -9,6 +9,7 @@ import type {
 } from './types'
 
 const REPO_STORAGE_KEY = 'branch-review.repoPath'
+const REPO_ROOT_STORAGE_KEY = 'branch-review.repoRoot'
 
 let activeRepoPath: string | null = null
 
@@ -27,6 +28,18 @@ export function setActiveRepoPath(repoPath: string | null): void {
 
 export function readStoredRepoPath(): string | null {
   return localStorage.getItem(REPO_STORAGE_KEY)
+}
+
+export function readStoredRepoRoot(): string | null {
+  return localStorage.getItem(REPO_ROOT_STORAGE_KEY)
+}
+
+export function setStoredRepoRoot(root: string | null): void {
+  if (root) {
+    localStorage.setItem(REPO_ROOT_STORAGE_KEY, root)
+  } else {
+    localStorage.removeItem(REPO_ROOT_STORAGE_KEY)
+  }
 }
 
 function withRepo(url: string): string {
@@ -59,12 +72,38 @@ async function request<T>(apiPath: string, init?: RequestInit): Promise<T> {
   return data as T
 }
 
-export function fetchRepos() {
-  return request<{
-    roots: string[]
-    preferredRepo: string | null
-    repos: RepoInfo[]
-  }>('/api/repos')
+export type RepoListResponse = {
+  roots: string[]
+  preferredRepo: string | null
+  repos: RepoInfo[]
+  cancelled?: boolean
+}
+
+export async function fetchRepos() {
+  const storedRoot = readStoredRepoRoot()
+  if (storedRoot) {
+    try {
+      const listed = await request<RepoListResponse>('/api/repo-roots', {
+        method: 'PUT',
+        body: JSON.stringify({ roots: [storedRoot] }),
+      })
+      if (listed.roots[0]) setStoredRepoRoot(listed.roots[0])
+      return listed
+    } catch {
+      setStoredRepoRoot(null)
+    }
+  }
+  return request<RepoListResponse>('/api/repos')
+}
+
+export async function pickRepoRoot() {
+  const listed = await request<RepoListResponse>('/api/repo-roots/pick', {
+    method: 'POST',
+  })
+  if (!listed.cancelled && listed.roots[0]) {
+    setStoredRepoRoot(listed.roots[0])
+  }
+  return listed
 }
 
 export function fetchMeta() {

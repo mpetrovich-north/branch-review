@@ -7,6 +7,7 @@ import {
   fetchRepos,
   fetchSuggestedBase,
   getActiveRepoPath,
+  pickRepoRoot,
   readStoredRepoPath,
   saveConfig,
   setActiveRepoPath,
@@ -26,6 +27,7 @@ import { parseViewUrl, replaceViewUrl } from './viewUrl'
 import './App.css'
 
 const REVIEW_BRANCH_PLACEHOLDER = ''
+const CHANGE_DIRECTORY_VALUE = '__change_directory__'
 
 function configIsReady(
   config: MetaResponse['config'],
@@ -422,11 +424,38 @@ export default function App() {
   )
 
   async function onRepoChange(next: string) {
+    if (next === CHANGE_DIRECTORY_VALUE) {
+      await changeScanDirectory()
+      return
+    }
     setLoading(true)
     try {
       await loadRepo(next)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to switch repo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function changeScanDirectory() {
+    setLoading(true)
+    setError(null)
+    try {
+      const listed = await pickRepoRoot()
+      if (listed.cancelled) return
+      setRepos(listed.repos)
+      const next = pickInitialRepo(listed.repos, listed.preferredRepo)
+      if (!next) {
+        setActiveRepoPath(null)
+        setRepoPath(null)
+        setMeta(null)
+        setError('No git repos found under the configured roots')
+        return
+      }
+      await loadRepo(next)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to change directory')
     } finally {
       setLoading(false)
     }
@@ -444,6 +473,11 @@ export default function App() {
     return (
       <div className="app-shell">
         <p className="error">{error ?? 'No repository selected.'}</p>
+        <p>
+          <button type="button" className="btn ghost" onClick={() => void changeScanDirectory()}>
+            Change directory…
+          </button>
+        </p>
       </div>
     )
   }
@@ -463,6 +497,7 @@ export default function App() {
             void onRepoChange(e.target.value)
           }}
         >
+          <option value={CHANGE_DIRECTORY_VALUE}>Change directory…</option>
           {repos.map((r) => (
             <option key={r.path} value={r.path} title={r.path}>
               {r.name}
