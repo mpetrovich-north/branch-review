@@ -255,7 +255,7 @@ pre,
 }
 
 .btn.ghost {
-  background: var(--surface);
+  background: transparent;
   color: var(--muted);
   border-color: var(--border);
 }
@@ -263,7 +263,7 @@ pre,
 .btn.ghost:hover:not(:disabled) {
   color: var(--accent);
   border-color: var(--accent);
-  background: var(--surface);
+  background: transparent;
 }
 
 .btn.link {
@@ -282,7 +282,8 @@ pre,
   text-decoration: underline;
 }
 
-.commit-edit-reset {
+.commit-edit-reset,
+.draft-reset {
   margin: 0;
   padding: 0;
   border: 0;
@@ -295,12 +296,14 @@ pre,
   cursor: pointer;
 }
 
-.commit-edit-reset:hover:not(:disabled) {
+.commit-edit-reset:hover:not(:disabled),
+.draft-reset:hover:not(:disabled) {
   color: var(--accent-hover);
   text-decoration: underline;
 }
 
-.commit-edit-reset:disabled {
+.commit-edit-reset:disabled,
+.draft-reset:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -646,7 +649,7 @@ pre,
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.35rem 0.55rem;
-  cursor: text;
+  cursor: pointer;
 }
 
 .commit-display.is-editing .commit-display-main {
@@ -687,18 +690,14 @@ pre,
   top: 0.1rem;
 }
 
-.commit-display:hover .commit-edit-trigger,
-.commit-display:focus-within .commit-edit-trigger {
+.commit-display:hover:not(:has(.commit-body-toggle:hover)) .commit-edit-trigger {
   opacity: 1;
   pointer-events: auto;
 }
 
-.commit-display:hover h2,
-.commit-display:hover .commit-body,
-.commit-display:hover .commit-body-empty,
-.commit-display:focus-within h2,
-.commit-display:focus-within .commit-body,
-.commit-display:focus-within .commit-body-empty {
+.commit-display:hover:not(:has(.commit-body-toggle:hover)) h2,
+.commit-display:hover:not(:has(.commit-body-toggle:hover)) .commit-body,
+.commit-display:hover:not(:has(.commit-body-toggle:hover)) .commit-body-empty {
   color: var(--muted);
 }
 
@@ -720,7 +719,7 @@ pre,
 .commit-edit {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 10px;
   min-width: 0;
   width: 100%;
 }
@@ -732,8 +731,18 @@ pre,
   right: 0;
   z-index: 5;
   box-sizing: border-box;
-  padding: 0.15rem 0 0.35rem;
+  padding: 10px;
   background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 10%, transparent),
+    0 2px 6px color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.compose-panel {
+  box-sizing: border-box;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--comment-border);
   border-radius: var(--radius);
   box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 10%, transparent),
     0 2px 6px color-mix(in srgb, var(--text) 6%, transparent);
@@ -755,7 +764,7 @@ pre,
 .commit-edit-textarea {
   font-size: 0.8rem;
   letter-spacing: 0;
-  font-family: inherit;
+  font-family: var(--mono);
   line-height: 1.45;
   resize: vertical;
   min-height: 4.5rem;
@@ -783,6 +792,8 @@ pre,
 }
 
 .commit-message-content {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   margin-top: 0.7rem;
 }
@@ -835,7 +846,7 @@ pre,
   white-space: pre-wrap;
   color: var(--text);
   font-size: 0.8rem;
-  font-family: inherit;
+  font-family: var(--mono);
   width: 100%;
 }
 
@@ -853,6 +864,7 @@ pre,
 .commit-body-empty {
   margin: 0;
   font-size: 0.8rem;
+  font-family: var(--mono);
 }
 
 .diff-layout {
