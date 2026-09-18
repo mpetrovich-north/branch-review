@@ -7,8 +7,10 @@ import {
   createCommentSchema,
   storedConfigSchema,
   updateCommentSchema,
+  upsertMessageEditSchema,
   type Comment,
   type CommentsFile,
+  type MessageEdit,
   type ReviewConfig,
 } from './schema.js'
 
@@ -76,6 +78,7 @@ function emptyCommentsFile(branch: string, baseBranch: string): CommentsFile {
     baseBranch,
     updatedAt: new Date().toISOString(),
     comments: [],
+    messageEdits: {},
   }
 }
 
@@ -191,6 +194,42 @@ export async function deleteComment(
 ): Promise<CommentsFile> {
   const file = await readComments(repoPath, branch, baseBranch)
   file.comments = file.comments.filter((c) => c.id !== commentId)
+  file.baseBranch = baseBranch
+  file.branch = branch
+  return writeCommentsFile(repoPath, file)
+}
+
+export async function upsertMessageEdit(
+  repoPath: string,
+  branch: string,
+  baseBranch: string,
+  commitSha: string,
+  input: unknown,
+): Promise<CommentsFile> {
+  const data = upsertMessageEditSchema.parse(input)
+  const file = await readComments(repoPath, branch, baseBranch)
+  const edits = { ...(file.messageEdits ?? {}) }
+  const current: MessageEdit = { ...(edits[commitSha] ?? {}) }
+
+  if (data.subject === null) {
+    delete current.subject
+  } else if (data.subject !== undefined) {
+    current.subject = data.subject
+  }
+
+  if (data.body === null) {
+    delete current.body
+  } else if (data.body !== undefined) {
+    current.body = data.body
+  }
+
+  if (current.subject === undefined && current.body === undefined) {
+    delete edits[commitSha]
+  } else {
+    edits[commitSha] = current
+  }
+
+  file.messageEdits = edits
   file.baseBranch = baseBranch
   file.branch = branch
   return writeCommentsFile(repoPath, file)

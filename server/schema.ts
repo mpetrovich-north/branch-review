@@ -37,12 +37,22 @@ export const commentSchema = z.discriminatedUnion('kind', [
   commitCommentSchema,
 ])
 
+export const messageEditSchema = z
+  .object({
+    subject: z.string().min(1).optional(),
+    body: z.string().optional(),
+  })
+  .refine((value) => value.subject !== undefined || value.body !== undefined, {
+    message: 'message edit must include subject and/or body',
+  })
+
 export const commentsFileSchema = z.object({
   version: z.literal(1),
   branch: z.string().min(1),
   baseBranch: z.string().min(1),
   updatedAt: z.string().datetime(),
   comments: z.array(commentSchema),
+  messageEdits: z.record(z.string(), messageEditSchema).default({}),
 })
 
 export const configSchema = z.object({
@@ -89,7 +99,17 @@ export const updateCommentSchema = z.object({
   body: z.string().min(1),
 })
 
+export const upsertMessageEditSchema = z
+  .object({
+    subject: z.union([z.string().min(1), z.null()]).optional(),
+    body: z.union([z.string(), z.null()]).optional(),
+  })
+  .refine((value) => value.subject !== undefined || value.body !== undefined, {
+    message: 'Provide subject and/or body (null clears that field)',
+  })
+
 export type Comment = z.infer<typeof commentSchema>
+export type MessageEdit = z.infer<typeof messageEditSchema>
 export type CommentsFile = z.infer<typeof commentsFileSchema>
 export type ReviewConfig = z.infer<typeof configSchema>
 export type LineType = z.infer<typeof lineTypeSchema>

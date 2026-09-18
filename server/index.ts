@@ -20,6 +20,7 @@ import {
   readComments,
   readConfig,
   updateComment,
+  upsertMessageEdit,
   writeConfig,
 } from './review-store.js'
 import {
@@ -262,6 +263,26 @@ app.delete(
       config.reviewBranch,
       config.baseBranch,
       String(req.params.id),
+    )
+    res.json(file)
+  }),
+)
+
+app.put(
+  '/api/message-edits/:sha',
+  asyncHandler(async (req, res) => {
+    const repoPath = await resolveRepo(req)
+    const config = await readConfig(repoPath)
+    if (!isConfigReady(config)) {
+      res.status(400).json({ error: 'Set reviewBranch and baseBranch in config first' })
+      return
+    }
+    const file = await upsertMessageEdit(
+      repoPath,
+      config.reviewBranch,
+      config.baseBranch,
+      String(req.params.sha),
+      req.body,
     )
     res.json(file)
   }),

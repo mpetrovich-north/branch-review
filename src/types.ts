@@ -31,12 +31,18 @@ export type CommitComment = {
 
 export type Comment = LineComment | FileComment | CommitComment
 
+export type MessageEdit = {
+  subject?: string
+  body?: string
+}
+
 export type CommentsFile = {
   version: 1
   branch: string
   baseBranch: string
   updatedAt: string
   comments: Comment[]
+  messageEdits: Record<string, MessageEdit>
 }
 
 export type ReviewConfig = {

@@ -118,3 +118,13 @@ export function updateComment(id: string, body: string) {
 export function removeComment(id: string) {
   return request<CommentsFile>(`/api/comments/${id}`, { method: 'DELETE' })
 }
+
+export function upsertMessageEdit(
+  sha: string,
+  patch: { subject?: string | null; body?: string | null },
+) {
+  return request<CommentsFile>(`/api/message-edits/${encodeURIComponent(sha)}`, {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  })
+}

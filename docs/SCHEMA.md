@@ -19,7 +19,8 @@
   "branch": "feat/my-branch",
   "baseBranch": "main",
   "updatedAt": "2026-09-17T20:00:00.000Z",
-  "comments": []
+  "comments": [],
+  "messageEdits": {}
 }
 ```
 
@@ -77,3 +78,22 @@ No `line`, `lineType`, or `snippet` on file comments.
 ```
 
 No `path`, `line`, `lineType`, or `snippet` on commit comments.
+
+### Message edits
+
+Optional map of commit SHA → overlay for the subject and/or body. Missing keys use the git commit text. Does not rewrite git history.
+
+```json
+{
+  "messageEdits": {
+    "abc1234def5678...": {
+      "subject": "feat(api): clarify filter error path",
+      "body": "Keep the public error shape stable."
+    }
+  }
+}
+```
+
+- Omit `subject` or `body` when that field is not overridden.
+- An empty `body` string means the description is intentionally blank.
+- Remove the SHA entry (or the field) to reset to git.
