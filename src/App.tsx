@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   fetchComments,
   fetchCommits,
@@ -25,7 +25,6 @@ export default function App() {
   const [meta, setMeta] = useState<MetaResponse | null>(null)
   const [baseDraft, setBaseDraft] = useState('main')
   const [reviewDraft, setReviewDraft] = useState('')
-  const [baseTouched, setBaseTouched] = useState(false)
   const [suggestion, setSuggestion] = useState<BaseSuggestion | null>(null)
   const [commits, setCommits] = useState<CommitSummary[]>([])
   const [selectedSha, setSelectedSha] = useState<string | null>(null)
@@ -35,6 +34,7 @@ export default function App() {
   const [diffLoading, setDiffLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savingConfig, setSavingConfig] = useState(false)
+  const hydrated = useRef(false)
 
   const loadReviewData = useCallback(async () => {
     const [commitRes, commentRes] = await Promise.all([fetchCommits(), fetchComments()])
@@ -58,15 +58,14 @@ export default function App() {
         setReviewDraft(review)
         if (configIsReady(m.config)) {
           setBaseDraft(m.config!.baseBranch)
-          setBaseTouched(true)
           setSuggestion(m.suggestedBase)
           await loadReviewData()
         } else {
           const suggested = m.suggestedBase?.baseBranch ?? m.defaultBaseBranch
           setBaseDraft(suggested)
-          setBaseTouched(false)
           setSuggestion(m.suggestedBase)
         }
+        hydrated.current = true
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Failed to load')
@@ -81,14 +80,18 @@ export default function App() {
   }, [loadReviewData])
 
   useEffect(() => {
-    if (!reviewDraft.trim()) return
+    if (!hydrated.current || !reviewDraft.trim()) return
     let cancelled = false
     const handle = window.setTimeout(() => {
+      const savedReview = meta?.config?.reviewBranch
       fetchSuggestedBase(reviewDraft.trim())
         .then((res) => {
           if (cancelled) return
           setSuggestion(res.suggestedBase)
-          if (!baseTouched && res.suggestedBase) {
+          // When the review branch changes, select the inferred base.
+          // If it still matches the saved review branch, keep the saved base.
+          if (savedReview === reviewDraft.trim()) return
+          if (res.suggestedBase) {
             setBaseDraft(res.suggestedBase.baseBranch)
           }
         })
@@ -100,7 +103,58 @@ export default function App() {
       cancelled = true
       window.clearTimeout(handle)
     }
-  }, [reviewDraft, baseTouched])
+  }, [reviewDraft, meta?.config?.reviewBranch])
+
+  useEffect(() => {
+    if (!hydrated.current || !meta) return
+    const reviewBranch = reviewDraft.trim()
+    const baseBranch = baseDraft.trim()
+    if (!reviewBranch || !baseBranch || reviewBranch === baseBranch) return
+    if (meta.config?.reviewBranch === reviewBranch && meta.config?.baseBranch === baseBranch) {
+      return
+    }
+
+    let cancelled = false
+    const handle = window.setTimeout(() => {
+      setSavingConfig(true)
+      setError(null)
+      saveConfig({ baseBranch, reviewBranch })
+        .then(async ({ config }) => {
+          if (cancelled) return
+          setMeta((m) => (m ? { ...m, config } : m))
+          await loadReviewData()
+        })
+        .catch((e) => {
+          if (!cancelled) {
+            setError(e instanceof Error ? e.message : 'Failed to save config')
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setSavingConfig(false)
+        })
+    }, 250)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(handle)
+    }
+  }, [reviewDraft, baseDraft, meta, loadReviewData])
+
+  useEffect(() => {
+    if (loading) return
+    const el = document.querySelector('.topbar')
+    if (!(el instanceof HTMLElement)) return
+    const apply = () => {
+      document.documentElement.style.setProperty(
+        '--topbar-offset',
+        `${el.getBoundingClientRect().height}px`,
+      )
+    }
+    apply()
+    const ro = new ResizeObserver(apply)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [loading, meta, savingConfig, error])
 
   useEffect(() => {
     if (!selectedSha) {
@@ -134,47 +188,17 @@ export default function App() {
     if (suggestion?.baseBranch) {
       list = [suggestion.baseBranch, ...list.filter((b) => b !== suggestion.baseBranch)]
     }
-    if (meta?.defaultBaseBranch) {
+    if (meta?.defaultBaseBranch && meta.defaultBaseBranch !== suggestion?.baseBranch) {
       list = [
+        ...(suggestion?.baseBranch ? [suggestion.baseBranch] : []),
         meta.defaultBaseBranch,
-        ...list.filter((b) => b !== meta.defaultBaseBranch && b !== suggestion?.baseBranch),
+        ...list.filter(
+          (b) => b !== suggestion?.baseBranch && b !== meta.defaultBaseBranch,
+        ),
       ]
-      if (suggestion?.baseBranch && suggestion.baseBranch !== meta.defaultBaseBranch) {
-        list = [
-          suggestion.baseBranch,
-          meta.defaultBaseBranch,
-          ...list.filter(
-            (b) => b !== suggestion.baseBranch && b !== meta.defaultBaseBranch,
-          ),
-        ]
-      }
     }
     return list
   }, [meta?.branches, meta?.defaultBaseBranch, baseDraft, suggestion?.baseBranch])
-
-  async function onSaveConfig() {
-    setSavingConfig(true)
-    setError(null)
-    try {
-      const { config } = await saveConfig({
-        baseBranch: baseDraft.trim(),
-        reviewBranch: reviewDraft.trim(),
-      })
-      setMeta((m) => (m ? { ...m, config } : m))
-      setBaseTouched(true)
-      await loadReviewData()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save config')
-    } finally {
-      setSavingConfig(false)
-    }
-  }
-
-  function applySuggestion() {
-    if (!suggestion) return
-    setBaseDraft(suggestion.baseBranch)
-    setBaseTouched(false)
-  }
 
   if (loading) {
     return (
@@ -192,7 +216,7 @@ export default function App() {
     )
   }
 
-  const needsSetup = !configIsReady(meta.config)
+  const ready = configIsReady(meta.config)
   const selected = commits.find((c) => c.sha === selectedSha) ?? null
   const selectedIndex = selected ? commits.findIndex((c) => c.sha === selected.sha) : -1
   const reviewBranch = meta.config?.reviewBranch
@@ -212,6 +236,12 @@ export default function App() {
             <span title={meta.repoPath}>{meta.repoPath}</span>
             <span className="sep">·</span>
             <span>{checkedOutNote}</span>
+            {savingConfig ? (
+              <>
+                <span className="sep">·</span>
+                <span>Updating…</span>
+              </>
+            ) : null}
           </p>
         </div>
         <div className="branch-controls">
@@ -220,10 +250,7 @@ export default function App() {
             <select
               id="review-branch"
               value={reviewDraft}
-              onChange={(e) => {
-                setReviewDraft(e.target.value)
-                setBaseTouched(false)
-              }}
+              onChange={(e) => setReviewDraft(e.target.value)}
             >
               {reviewDraft && !reviewOptions.includes(reviewDraft) ? (
                 <option value={reviewDraft}>{reviewDraft}</option>
@@ -240,10 +267,7 @@ export default function App() {
             <select
               id="base-branch"
               value={baseDraft}
-              onChange={(e) => {
-                setBaseDraft(e.target.value)
-                setBaseTouched(true)
-              }}
+              onChange={(e) => setBaseDraft(e.target.value)}
             >
               {baseDraft && !baseOptions.includes(baseDraft) ? (
                 <option value={baseDraft}>{baseDraft}</option>
@@ -251,45 +275,17 @@ export default function App() {
               {baseOptions.map((b) => (
                 <option key={b} value={b}>
                   {b}
-                  {suggestion?.baseBranch === b ? ' (suggested)' : ''}
                 </option>
               ))}
             </select>
           </div>
-          <button type="button" className="btn" disabled={savingConfig} onClick={onSaveConfig}>
-            {configIsReady(meta.config) ? 'Update' : 'Start review'}
-          </button>
         </div>
       </header>
 
-      {suggestion ? (
-        <p className="suggest-banner">
-          Suggested base for <code>{reviewDraft}</code>: <code>{suggestion.baseBranch}</code>
-          <span className="sep">·</span>
-          {suggestion.detail}
-          {baseDraft !== suggestion.baseBranch ? (
-            <>
-              <span className="sep">·</span>
-              <button type="button" className="btn link" onClick={applySuggestion}>
-                Use suggestion
-              </button>
-            </>
-          ) : null}
-        </p>
-      ) : null}
-
       {error ? <p className="error banner">{error}</p> : null}
 
-      {needsSetup ? (
-        <section className="setup">
-          <h2>Choose branches</h2>
-          <p>
-            Pick the review branch (commits to inspect) and the base branch. For stacked work, the
-            base is inferred when possible (parent branch tip that is an ancestor of the review
-            branch). The app reads those refs only; it does not check out or change the branch on
-            disk. Saved to <code>.review/config.json</code>.
-          </p>
-        </section>
+      {!ready ? (
+        <p className="muted setup-wait">Choose review and base branches to start.</p>
       ) : (
         <div className="main-layout">
           <aside className="commit-list">
@@ -299,25 +295,27 @@ export default function App() {
                 {commits.length} on {reviewBranch} vs {meta.config?.baseBranch}
               </span>
             </div>
-            {commits.length === 0 ? (
-              <p className="empty">No commits ahead of the base branch.</p>
-            ) : (
-              <ol>
-                {commits.map((c, i) => (
-                  <li key={c.sha}>
-                    <button
-                      type="button"
-                      className={c.sha === selectedSha ? 'active' : ''}
-                      onClick={() => setSelectedSha(c.sha)}
-                    >
-                      <span className="idx">{i + 1}</span>
-                      <span className="subject">{c.subject}</span>
-                      <code className="sha">{c.shortSha}</code>
-                    </button>
-                  </li>
-                ))}
-              </ol>
-            )}
+            <div className="commit-list-body">
+              {commits.length === 0 ? (
+                <p className="empty">No commits ahead of the base branch.</p>
+              ) : (
+                <ol>
+                  {commits.map((c, i) => (
+                    <li key={c.sha}>
+                      <button
+                        type="button"
+                        className={c.sha === selectedSha ? 'active' : ''}
+                        onClick={() => setSelectedSha(c.sha)}
+                      >
+                        <span className="idx">{i + 1}</span>
+                        <span className="subject">{c.subject}</span>
+                        <code className="sha">{c.shortSha}</code>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
           </aside>
 
           <main className="main-pane">
