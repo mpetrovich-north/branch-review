@@ -8,7 +8,7 @@ import type {
   ReviewConfig,
 } from './types'
 
-const REPO_STORAGE_KEY = 'commit-review.repoPath'
+const REPO_STORAGE_KEY = 'branch-review.repoPath'
 
 let activeRepoPath: string | null = null
 

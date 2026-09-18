@@ -18,7 +18,7 @@ export function parsePreferredRepo(): string | null {
 /** Directory used to infer the default scan root (caller cwd, not the app install dir). */
 function inferenceCwd(): string {
   return path.resolve(
-    process.env.COMMIT_REVIEW_CWD ?? process.env.INIT_CWD ?? process.cwd(),
+    process.env.BRANCH_REVIEW_CWD ?? process.env.INIT_CWD ?? process.cwd(),
   )
 }
 

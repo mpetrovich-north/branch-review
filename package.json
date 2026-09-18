@@ -1,5 +1,5 @@
 {
-  "name": "commit-review",
+  "name": "branch-review",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -12,7 +12,7 @@
     "lint": "oxlint"
   },
   "bin": {
-    "commit-review": "./bin/commit-review.js"
+    "branch-review": "./bin/branch-review.js"
   },
   "dependencies": {
     "cors": "^2.8.6",

@@ -18,7 +18,7 @@ const child = spawn(
     env: {
       ...process.env,
       PORT: port,
-      COMMIT_REVIEW_CWD: process.env.COMMIT_REVIEW_CWD ?? callerCwd,
+      BRANCH_REVIEW_CWD: process.env.BRANCH_REVIEW_CWD ?? callerCwd,
       ...(preferred ? { REPO_PATH: preferred } : {}),
       NODE_ENV: process.env.NODE_ENV ?? 'production',
     },

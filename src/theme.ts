@@ -1,6 +1,6 @@
 export type ThemePreference = 'light' | 'dark'
 
-const STORAGE_KEY = 'commit-review-theme'
+const STORAGE_KEY = 'branch-review-theme'
 
 export function readStoredTheme(): ThemePreference | null {
   try {

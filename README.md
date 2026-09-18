@@ -1,4 +1,4 @@
-# commit-review
+# branch-review
 
 Local GitHub-style UI to review commits on a branch one at a time and leave comments on lines or on the commit message. Comments are stored as JSON under `.review/` in the target repository.
 
@@ -7,7 +7,7 @@ This app does not apply fixes. An agent skill (separate) can read `.review/` and
 ## Quick start
 
 ```bash
-cd commit-review
+cd branch-review
 npm install
 npm run build
 npm start
@@ -67,6 +67,7 @@ See [docs/SCHEMA.md](docs/SCHEMA.md).
 | --- | --- |
 | `REPO_ROOT` / `REPO_ROOTS` | Folder(s) to scan for git repos (default: cwd, or parent of cwd/preferred repo; comma-separated for several) |
 | `REPO_PATH` | Optional preferred repo for first load |
+| `BRANCH_REVIEW_CWD` | Caller cwd used when inferring the default scan root |
 | `PORT` | API/UI port (default `8787`) |
 
 ## Requirements

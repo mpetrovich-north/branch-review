@@ -283,7 +283,7 @@ async function main() {
   }
 
   app.listen(port, () => {
-    console.log(`commit-review listening on http://localhost:${port}`)
+    console.log(`branch-review listening on http://localhost:${port}`)
     console.log(`roots: ${roots.join(', ')}`)
     if (preferredRepo) console.log(`preferred: ${preferredRepo}`)
   })
