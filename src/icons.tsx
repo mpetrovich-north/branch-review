@@ -194,3 +194,22 @@ export function CommentBubbleIcon(props: IconProps) {
   )
 }
 
+export function EditIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M9.6 3.15 12.85 6.4 5.7 13.55H2.45v-3.25L9.6 3.15Z"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8.35 4.4 11.6 7.65"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+      />
+    </Svg>
+  )
+}
+
