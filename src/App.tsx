@@ -4,11 +4,22 @@ import {
   fetchCommits,
   fetchDiff,
   fetchMeta,
+  fetchRepos,
   fetchSuggestedBase,
+  getActiveRepoPath,
+  readStoredRepoPath,
   saveConfig,
+  setActiveRepoPath,
 } from './api'
 import { CommitReview } from './CommitReview'
-import type { BaseSuggestion, Comment, CommitSummary, DiffFile, MetaResponse } from './types'
+import type {
+  BaseSuggestion,
+  Comment,
+  CommitSummary,
+  DiffFile,
+  MetaResponse,
+  RepoInfo,
+} from './types'
 import './App.css'
 
 function configIsReady(config: MetaResponse['config']): boolean {
@@ -21,7 +32,25 @@ function withBranch(branches: string[], extra: string | null | undefined): strin
   return [extra, ...branches]
 }
 
+function repoFromUrl(): string | null {
+  const value = new URLSearchParams(window.location.search).get('repo')
+  return value && value.trim() ? value.trim() : null
+}
+
+function pickInitialRepo(
+  repos: RepoInfo[],
+  preferredRepo: string | null,
+): string | null {
+  const candidates = [repoFromUrl(), readStoredRepoPath(), preferredRepo]
+  for (const candidate of candidates) {
+    if (candidate && repos.some((r) => r.path === candidate)) return candidate
+  }
+  return repos[0]?.path ?? preferredRepo ?? null
+}
+
 export default function App() {
+  const [repos, setRepos] = useState<RepoInfo[]>([])
+  const [repoPath, setRepoPath] = useState<string | null>(null)
   const [meta, setMeta] = useState<MetaResponse | null>(null)
   const [baseDraft, setBaseDraft] = useState('main')
   const [reviewDraft, setReviewDraft] = useState('')
@@ -46,26 +75,48 @@ export default function App() {
     })
   }, [])
 
+  const loadRepo = useCallback(
+    async (nextRepo: string) => {
+      setActiveRepoPath(nextRepo)
+      setRepoPath(nextRepo)
+      hydrated.current = false
+      setError(null)
+      setCommits([])
+      setFiles([])
+      setComments([])
+      setSelectedSha(null)
+      const m = await fetchMeta()
+      setMeta(m)
+      const review =
+        m.config?.reviewBranch ?? m.defaultReviewBranch ?? m.checkedOutBranch ?? ''
+      setReviewDraft(review)
+      if (configIsReady(m.config)) {
+        setBaseDraft(m.config!.baseBranch)
+        setSuggestion(m.suggestedBase)
+        await loadReviewData()
+      } else {
+        const suggested = m.suggestedBase?.baseBranch ?? m.defaultBaseBranch
+        setBaseDraft(suggested)
+        setSuggestion(m.suggestedBase)
+      }
+      hydrated.current = true
+    },
+    [loadReviewData],
+  )
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const m = await fetchMeta()
+        const listed = await fetchRepos()
         if (cancelled) return
-        setMeta(m)
-        const review =
-          m.config?.reviewBranch ?? m.defaultReviewBranch ?? m.checkedOutBranch ?? ''
-        setReviewDraft(review)
-        if (configIsReady(m.config)) {
-          setBaseDraft(m.config!.baseBranch)
-          setSuggestion(m.suggestedBase)
-          await loadReviewData()
-        } else {
-          const suggested = m.suggestedBase?.baseBranch ?? m.defaultBaseBranch
-          setBaseDraft(suggested)
-          setSuggestion(m.suggestedBase)
+        setRepos(listed.repos)
+        const initial = pickInitialRepo(listed.repos, listed.preferredRepo)
+        if (!initial) {
+          setError('No git repos found under the configured roots')
+          return
         }
-        hydrated.current = true
+        await loadRepo(initial)
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Failed to load')
@@ -77,10 +128,10 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [loadReviewData])
+  }, [loadRepo])
 
   useEffect(() => {
-    if (!hydrated.current || !reviewDraft.trim()) return
+    if (!hydrated.current || !reviewDraft.trim() || !getActiveRepoPath()) return
     let cancelled = false
     const handle = window.setTimeout(() => {
       const savedReview = meta?.config?.reviewBranch
@@ -88,8 +139,6 @@ export default function App() {
         .then((res) => {
           if (cancelled) return
           setSuggestion(res.suggestedBase)
-          // When the review branch changes, select the inferred base.
-          // If it still matches the saved review branch, keep the saved base.
           if (savedReview === reviewDraft.trim()) return
           if (res.suggestedBase) {
             setBaseDraft(res.suggestedBase.baseBranch)
@@ -103,10 +152,10 @@ export default function App() {
       cancelled = true
       window.clearTimeout(handle)
     }
-  }, [reviewDraft, meta?.config?.reviewBranch])
+  }, [reviewDraft, meta?.config?.reviewBranch, repoPath])
 
   useEffect(() => {
-    if (!hydrated.current || !meta) return
+    if (!hydrated.current || !meta || !getActiveRepoPath()) return
     const reviewBranch = reviewDraft.trim()
     const baseBranch = baseDraft.trim()
     if (!reviewBranch || !baseBranch || reviewBranch === baseBranch) return
@@ -138,7 +187,7 @@ export default function App() {
       cancelled = true
       window.clearTimeout(handle)
     }
-  }, [reviewDraft, baseDraft, meta, loadReviewData])
+  }, [reviewDraft, baseDraft, meta, loadReviewData, repoPath])
 
   useEffect(() => {
     if (loading) return
@@ -154,7 +203,7 @@ export default function App() {
     const ro = new ResizeObserver(apply)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [loading, meta, savingConfig, error])
+  }, [loading, meta, savingConfig, error, repoPath])
 
   useEffect(() => {
     if (!selectedSha) {
@@ -176,7 +225,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [selectedSha])
+  }, [selectedSha, repoPath])
 
   const reviewOptions = useMemo(
     () => withBranch(meta?.branches ?? [], reviewDraft),
@@ -200,7 +249,18 @@ export default function App() {
     return list
   }, [meta?.branches, meta?.defaultBaseBranch, baseDraft, suggestion?.baseBranch])
 
-  if (loading) {
+  async function onRepoChange(next: string) {
+    setLoading(true)
+    try {
+      await loadRepo(next)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to switch repo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading && !meta) {
     return (
       <div className="app-shell">
         <p className="muted">Loading…</p>
@@ -208,18 +268,18 @@ export default function App() {
     )
   }
 
-  if (!meta) {
+  if (!repoPath || (!meta && error)) {
     return (
       <div className="app-shell">
-        <p className="error">{error ?? 'Could not reach the review server.'}</p>
+        <p className="error">{error ?? 'No repository selected.'}</p>
       </div>
     )
   }
 
-  const ready = configIsReady(meta.config)
+  const ready = configIsReady(meta?.config ?? null)
   const selected = commits.find((c) => c.sha === selectedSha) ?? null
   const selectedIndex = selected ? commits.findIndex((c) => c.sha === selected.sha) : -1
-  const reviewBranch = meta.config?.reviewBranch
+  const reviewBranch = meta?.config?.reviewBranch
 
   return (
     <div className="app-shell">
@@ -227,22 +287,33 @@ export default function App() {
         <div>
           <h1>Commit review</h1>
           <p className="meta">
-            <span title={meta.repoPath}>{meta.repoPath}</span>
-            {savingConfig ? (
-              <>
-                <span className="sep">·</span>
-                <span>Updating…</span>
-              </>
-            ) : null}
+            {savingConfig ? <span>Updating…</span> : <span title={repoPath}>{repoPath}</span>}
           </p>
         </div>
         <div className="branch-controls">
+          <div className="field">
+            <label htmlFor="repo-path">Repo</label>
+            <select
+              id="repo-path"
+              value={repoPath}
+              onChange={(e) => {
+                void onRepoChange(e.target.value)
+              }}
+            >
+              {repos.map((r) => (
+                <option key={r.path} value={r.path}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="field">
             <label htmlFor="review-branch">Review branch</label>
             <select
               id="review-branch"
               value={reviewDraft}
               onChange={(e) => setReviewDraft(e.target.value)}
+              disabled={!meta}
             >
               {reviewDraft && !reviewOptions.includes(reviewDraft) ? (
                 <option value={reviewDraft}>{reviewDraft}</option>
@@ -260,6 +331,7 @@ export default function App() {
               id="base-branch"
               value={baseDraft}
               onChange={(e) => setBaseDraft(e.target.value)}
+              disabled={!meta}
             >
               {baseDraft && !baseOptions.includes(baseDraft) ? (
                 <option value={baseDraft}>{baseDraft}</option>
@@ -276,8 +348,10 @@ export default function App() {
 
       {error ? <p className="error banner">{error}</p> : null}
 
-      {!ready ? (
-        <p className="muted setup-wait">Choose review and base branches to start.</p>
+      {!meta || !ready ? (
+        <p className="muted setup-wait">
+          {meta ? 'Choose review and base branches to start.' : 'Loading repository…'}
+        </p>
       ) : (
         <div className="main-layout">
           <aside className="commit-list">

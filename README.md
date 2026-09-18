@@ -9,22 +9,28 @@ This app does not apply fixes. An agent skill (separate) can read `.review/` and
 ```bash
 cd commit-review
 npm install
-REPO_PATH=/path/to/your/repo npm run dev
+npm run build
+npm start
 ```
 
-Open http://localhost:5173
+Open http://localhost:8787 and pick a **Repo** in the header (git repos under `~/Code` by default).
 
-Or pass the repo as an argument to the server:
+Optional:
 
 ```bash
-REPO_PATH=/path/to/your/repo npm run dev
-# equivalent server-only:
-npx tsx server/index.ts /path/to/your/repo
+# Scan a different folder for repos
+REPO_ROOT=/path/to/projects npm start
+
+# Prefer a repo on first load (still switchable in the UI)
+REPO_PATH=/path/to/your/repo npm start
+
+# Dev (Vite UI on :5173, API on :8787)
+REPO_ROOT=~/Code npm run dev
 ```
 
 ## Flow
 
-1. Set **review branch** and **base branch** in the UI (defaults: checked-out branch and `main`). Saved to `.review/config.json`. The app does not check out the review branch.
+1. Choose **Repo**, **review branch**, and **base branch** in the UI. Branch choices are saved to that repo’s `.review/config.json`. The app does not check out the review branch.
 2. Review commits on the review branch that are not on the base branch.
 3. Comment on a commit message or on a diff line.
 4. Comments are written to `.review/comments/<branch-slug>.json` for the **review** branch.
@@ -49,10 +55,17 @@ See [docs/SCHEMA.md](docs/SCHEMA.md).
 | --- | --- |
 | `npm run dev` | API on `:8787` + Vite UI on `:5173` |
 | `npm run build` | Build the UI into `dist/` |
-| `npm start` | Serve API + built UI (set `REPO_PATH`) |
+| `npm start` | Serve API + built UI |
+
+## Environment
+
+| Variable | Purpose |
+| --- | --- |
+| `REPO_ROOT` / `REPO_ROOTS` | Folder(s) to scan for git repos (default `~/Code`; comma-separated for several) |
+| `REPO_PATH` | Optional preferred repo for first load |
+| `PORT` | API/UI port (default `8787`) |
 
 ## Requirements
 
 - Node 22+
 - `git` on `PATH`
-- Target path must be a git work tree on a branch (not detached HEAD)

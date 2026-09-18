@@ -70,6 +70,11 @@ export type BaseSuggestion = {
   detail: string
 }
 
+export type RepoInfo = {
+  path: string
+  name: string
+}
+
 export type MetaResponse = {
   repoPath: string
   checkedOutBranch: string | null
@@ -79,3 +84,4 @@ export type MetaResponse = {
   defaultReviewBranch: string | null
   suggestedBase: BaseSuggestion | null
 }
+

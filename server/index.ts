@@ -21,26 +21,21 @@ import {
   readConfig,
   writeConfig,
 } from './review-store.js'
+import {
+  assertAllowedRepo,
+  listRepos,
+  parsePreferredRepo,
+  parseRepoRoots,
+} from './repos.js'
 import { configSchema } from './schema.js'
 
-function parseRepoPath(): string {
-  const fromEnv = process.env.REPO_PATH
-  const fromArg = process.argv.slice(2).find((a) => !a.startsWith('-'))
-  const repoPath = path.resolve(fromArg ?? fromEnv ?? process.cwd())
-  return repoPath
-}
-
-const repoPath = parseRepoPath()
+const roots = parseRepoRoots()
+const preferredRepo = parsePreferredRepo()
 const port = Number(process.env.PORT ?? 8787)
 
 const app = express()
 app.use(cors())
 app.use(express.json({ limit: '2mb' }))
-
-app.use((_req, res, next) => {
-  res.setHeader('X-Commit-Review-Repo', repoPath)
-  next()
-})
 
 function asyncHandler(
   fn: (req: express.Request, res: express.Response) => Promise<void>,
@@ -50,19 +45,58 @@ function asyncHandler(
   }
 }
 
+async function resolveRepo(req: express.Request): Promise<string> {
+  const raw = req.header('x-repo-path') ?? req.query.repo
+  if (raw == null || String(raw).trim() === '') {
+    throw Object.assign(new Error('X-Repo-Path header or repo query is required'), {
+      status: 400,
+    })
+  }
+  try {
+    return await assertAllowedRepo(String(raw), roots, preferredRepo ? [preferredRepo] : [])
+  } catch (error) {
+    throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
+      status: 400,
+    })
+  }
+}
+
 app.get(
   '/api/health',
   asyncHandler(async (_req, res) => {
-    await assertGitRepo(repoPath)
-    const checkedOutBranch = await getCheckedOutBranch(repoPath)
-    res.json({ ok: true, repoPath, checkedOutBranch })
+    res.json({
+      ok: true,
+      roots,
+      preferredRepo,
+    })
+  }),
+)
+
+app.get(
+  '/api/repos',
+  asyncHandler(async (_req, res) => {
+    const repos = await listRepos(roots)
+    if (preferredRepo) {
+      try {
+        await assertGitRepo(preferredRepo)
+        if (!repos.some((r) => r.path === preferredRepo)) {
+          repos.unshift({
+            path: preferredRepo,
+            name: path.basename(preferredRepo),
+          })
+        }
+      } catch {
+        // preferred path is not a git repo; ignore
+      }
+    }
+    res.json({ roots, preferredRepo, repos })
   }),
 )
 
 app.get(
   '/api/meta',
-  asyncHandler(async (_req, res) => {
-    await assertGitRepo(repoPath)
+  asyncHandler(async (req, res) => {
+    const repoPath = await resolveRepo(req)
     const checkedOutBranch = await getCheckedOutBranch(repoPath)
     const config = await readConfig(repoPath)
     const branches = await listBranches(repoPath)
@@ -87,6 +121,7 @@ app.get(
 app.get(
   '/api/suggest-base',
   asyncHandler(async (req, res) => {
+    const repoPath = await resolveRepo(req)
     const reviewBranch = String(req.query.reviewBranch ?? '').trim()
     if (!reviewBranch) {
       res.status(400).json({ error: 'reviewBranch query param is required' })
@@ -103,7 +138,8 @@ app.get(
 
 app.get(
   '/api/config',
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const repoPath = await resolveRepo(req)
     const config = await readConfig(repoPath)
     res.json({ config })
   }),
@@ -112,6 +148,7 @@ app.get(
 app.put(
   '/api/config',
   asyncHandler(async (req, res) => {
+    const repoPath = await resolveRepo(req)
     const parsed = configSchema.parse(req.body)
     if (!(await branchExists(repoPath, parsed.baseBranch))) {
       res.status(400).json({ error: `Base branch not found: ${parsed.baseBranch}` })
@@ -132,7 +169,8 @@ app.put(
 
 app.get(
   '/api/commits',
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const repoPath = await resolveRepo(req)
     const config = await readConfig(repoPath)
     if (!isConfigReady(config)) {
       res.status(400).json({ error: 'Set reviewBranch and baseBranch in config first' })
@@ -154,6 +192,7 @@ app.get(
 app.get(
   '/api/commits/:sha/diff',
   asyncHandler(async (req, res) => {
+    const repoPath = await resolveRepo(req)
     const sha = String(req.params.sha)
     const files = await getCommitDiff(repoPath, sha)
     res.json({ sha, files })
@@ -162,7 +201,8 @@ app.get(
 
 app.get(
   '/api/comments',
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const repoPath = await resolveRepo(req)
     const config = await readConfig(repoPath)
     if (!isConfigReady(config)) {
       res.status(400).json({ error: 'Set reviewBranch and baseBranch in config first' })
@@ -176,6 +216,7 @@ app.get(
 app.post(
   '/api/comments',
   asyncHandler(async (req, res) => {
+    const repoPath = await resolveRepo(req)
     const config = await readConfig(repoPath)
     if (!isConfigReady(config)) {
       res.status(400).json({ error: 'Set reviewBranch and baseBranch in config first' })
@@ -189,6 +230,7 @@ app.post(
 app.delete(
   '/api/comments/:id',
   asyncHandler(async (req, res) => {
+    const repoPath = await resolveRepo(req)
     const config = await readConfig(repoPath)
     if (!isConfigReady(config)) {
       res.status(400).json({ error: 'Set reviewBranch and baseBranch in config first' })
@@ -215,6 +257,12 @@ app.use(
       res.status(400).json({ error: err.message, detail: err.stderr })
       return
     }
+    if (err && typeof err === 'object' && 'status' in err && typeof err.status === 'number') {
+      res.status(err.status).json({
+        error: err instanceof Error ? err.message : 'Request error',
+      })
+      return
+    }
     if (err && typeof err === 'object' && 'name' in err && err.name === 'ZodError') {
       res.status(400).json({ error: 'Invalid request', detail: err })
       return
@@ -225,9 +273,6 @@ app.use(
 )
 
 async function main() {
-  await assertGitRepo(repoPath)
-  const checkedOutBranch = await getCheckedOutBranch(repoPath)
-
   const isProd = process.env.NODE_ENV === 'production'
   if (isProd) {
     const dist = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist')
@@ -239,8 +284,8 @@ async function main() {
 
   app.listen(port, () => {
     console.log(`commit-review listening on http://localhost:${port}`)
-    console.log(`repo: ${repoPath}`)
-    console.log(`checked out: ${checkedOutBranch ?? '(detached)'}`)
+    console.log(`roots: ${roots.join(', ')}`)
+    if (preferredRepo) console.log(`preferred: ${preferredRepo}`)
   })
 }
 

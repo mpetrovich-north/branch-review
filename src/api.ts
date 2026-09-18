@@ -1,18 +1,52 @@
 import type {
+  BaseSuggestion,
   CommentsFile,
   CommitSummary,
   DiffFile,
   MetaResponse,
+  RepoInfo,
   ReviewConfig,
 } from './types'
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
+const REPO_STORAGE_KEY = 'commit-review.repoPath'
+
+let activeRepoPath: string | null = null
+
+export function getActiveRepoPath(): string | null {
+  return activeRepoPath
+}
+
+export function setActiveRepoPath(repoPath: string | null): void {
+  activeRepoPath = repoPath
+  if (repoPath) {
+    localStorage.setItem(REPO_STORAGE_KEY, repoPath)
+  } else {
+    localStorage.removeItem(REPO_STORAGE_KEY)
+  }
+}
+
+export function readStoredRepoPath(): string | null {
+  return localStorage.getItem(REPO_STORAGE_KEY)
+}
+
+function withRepo(url: string): string {
+  if (!activeRepoPath) return url
+  const join = url.includes('?') ? '&' : '?'
+  return `${url}${join}repo=${encodeURIComponent(activeRepoPath)}`
+}
+
+async function request<T>(apiPath: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init?.headers as Record<string, string> | undefined),
+  }
+  if (activeRepoPath) {
+    headers['X-Repo-Path'] = activeRepoPath
+  }
+
+  const res = await fetch(withRepo(apiPath), {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
+    headers,
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
@@ -25,6 +59,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T
 }
 
+export function fetchRepos() {
+  return request<{
+    roots: string[]
+    preferredRepo: string | null
+    repos: RepoInfo[]
+  }>('/api/repos')
+}
+
 export function fetchMeta() {
   return request<MetaResponse>('/api/meta')
 }
@@ -32,7 +74,7 @@ export function fetchMeta() {
 export function fetchSuggestedBase(reviewBranch: string) {
   return request<{
     reviewBranch: string
-    suggestedBase: import('./types').BaseSuggestion | null
+    suggestedBase: BaseSuggestion | null
   }>(`/api/suggest-base?reviewBranch=${encodeURIComponent(reviewBranch)}`)
 }
 
@@ -44,7 +86,11 @@ export function saveConfig(config: ReviewConfig) {
 }
 
 export function fetchCommits() {
-  return request<{ baseBranch: string; commits: CommitSummary[] }>('/api/commits')
+  return request<{
+    baseBranch: string
+    reviewBranch: string
+    commits: CommitSummary[]
+  }>('/api/commits')
 }
 
 export function fetchDiff(sha: string) {
