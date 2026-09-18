@@ -142,95 +142,45 @@ function beginEdit() {
     setEditing(true)
   }
 
-  if (editing) {
-    return (
-      <div className={`commit-edit commit-edit-${kind}`}>
-        {kind === 'subject' ? (
-          <input
-            className="commit-edit-input"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            disabled={busy}
-            autoFocus
-            aria-label="Commit subject"
-          />
-        ) : (
-          <textarea
-            className="commit-edit-input commit-edit-textarea"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            disabled={busy}
-            rows={Math.min(12, Math.max(3, draft.split('\n').length + 1))}
-            autoFocus
-            aria-label="Commit description"
-          />
-        )}
-        <div className="draft-actions">
-          <button
-            type="button"
-            className="btn"
-            disabled={busy || (kind === 'subject' && !draft.trim())}
-            onClick={() => void save()}
-          >
-            Save
-          </button>
-          <button
-            type="button"
-            className="btn ghost"
-            disabled={busy}
-            onClick={() => {
-              setEditing(false)
-              setDraft(display)
-            }}
-          >
-            Cancel
-          </button>
-          {isEdited ? (
-            <button
-              type="button"
-              className="btn link"
-              disabled={busy}
-              onClick={() => {
-                void onReset().then(() => {
-                  setEditing(false)
-                  setDraft(original)
-                })
-              }}
-            >
-              Reset
-            </button>
-          ) : null}
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className={`commit-display commit-display-${kind}`}>
-      <button
-        type="button"
-        className="comment-bubble commit-edit-trigger"
-        title={kind === 'subject' ? 'Edit subject' : 'Edit description'}
-        aria-label={kind === 'subject' ? 'Edit subject' : 'Edit description'}
-        disabled={busy}
-        onClick={beginEdit}
-      >
-        <EditIcon />
-      </button>
+    <div
+      className={`commit-display commit-display-${kind}${editing ? ' is-editing' : ''}`}
+    >
+      {!editing ? (
+        <button
+          type="button"
+          className="comment-bubble commit-edit-trigger"
+          title={kind === 'subject' ? 'Edit subject' : 'Edit description'}
+          aria-label={kind === 'subject' ? 'Edit subject' : 'Edit description'}
+          disabled={busy}
+          onClick={beginEdit}
+        >
+          <EditIcon />
+        </button>
+      ) : null}
       <div
         className="commit-display-main"
-        role="button"
-        tabIndex={0}
-        onClick={(e) => {
-          if ((e.target as HTMLElement).closest('button')) return
-          beginEdit()
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            beginEdit()
-          }
-        }}
+        role={editing ? undefined : 'button'}
+        tabIndex={editing ? undefined : 0}
+        aria-hidden={editing || undefined}
+        onClick={
+          editing
+            ? undefined
+            : (e) => {
+                if ((e.target as HTMLElement).closest('button')) return
+                beginEdit()
+              }
+        }
+        onKeyDown={
+          editing
+            ? undefined
+            : (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  beginEdit()
+                }
+              }
+        }
       >
         {kind === 'subject' ? (
           <h2 className={isEdited ? 'is-edited' : undefined}>{display}</h2>
@@ -249,6 +199,66 @@ function beginEdit() {
           </span>
         ) : null}
       </div>
+      {editing ? (
+        <div className={`commit-edit commit-edit-overlay commit-edit-${kind}`}>
+          {kind === 'subject' ? (
+            <input
+              className="commit-edit-input"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={busy}
+              autoFocus
+              aria-label="Commit subject"
+            />
+          ) : (
+            <textarea
+              className="commit-edit-input commit-edit-textarea"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={busy}
+              rows={Math.min(12, Math.max(3, draft.split('\n').length + 1))}
+              autoFocus
+              aria-label="Commit description"
+            />
+          )}
+          <div className="draft-actions">
+            <button
+              type="button"
+              className="btn"
+              disabled={busy || (kind === 'subject' && !draft.trim())}
+              onClick={() => void save()}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={busy}
+              onClick={() => {
+                setEditing(false)
+                setDraft(display)
+              }}
+            >
+              Cancel
+            </button>
+            {isEdited ? (
+              <button
+                type="button"
+                className="btn link"
+                disabled={busy}
+                onClick={() => {
+                  void onReset().then(() => {
+                    setEditing(false)
+                    setDraft(original)
+                  })
+                }}
+              >
+                Reset
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -540,8 +550,8 @@ function FileDiffSection({
         <button
           type="button"
           className="comment-bubble"
-          title="Comment on file"
-          aria-label="Comment on file"
+          title="Comment on this file"
+          aria-label="Comment on this file"
           onClick={() => onStartFileComment(file.path)}
         >
           <CommentBubbleIcon />
@@ -1057,8 +1067,8 @@ export function CommitReview({
             <button
               type="button"
               className="comment-bubble"
-              title="Comment on commit"
-              aria-label="Comment on commit"
+              title="Comment on this commit"
+              aria-label="Comment on this commit"
               onClick={() => {
                 setDraftCommit(true)
                 setDraftLine(null)

@@ -560,29 +560,31 @@ export default function App() {
                 <div className="commit-list-count">
                   {commits.length} {commits.length === 1 ? 'commit' : 'commits'}
                 </div>
-                <ol>
-                  {commits.map((c, i) => (
-                    <li key={c.sha}>
-                      <button
-                        type="button"
-                        className={c.sha === selectedSha ? 'active' : ''}
-                        onClick={() => {
-                          setSeedFilePath(null)
-                          setSelectedSha(c.sha)
-                        }}
-                      >
-                        <span className="idx">{i + 1}</span>
-                        <span className="subject">
-                          {messageEdits[c.sha]?.subject ?? c.subject}
-                        </span>
-                        <span className="sha-with-icon">
-                          <CommitIcon className="commit-hash-icon" />
-                          <code className="sha">{c.shortSha}</code>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ol>
+                <div className="commit-list-scroll">
+                  <ol>
+                    {commits.map((c, i) => (
+                      <li key={c.sha}>
+                        <button
+                          type="button"
+                          className={c.sha === selectedSha ? 'active' : ''}
+                          onClick={() => {
+                            setSeedFilePath(null)
+                            setSelectedSha(c.sha)
+                          }}
+                        >
+                          <span className="idx">{i + 1}</span>
+                          <span className="subject">
+                            {messageEdits[c.sha]?.subject ?? c.subject}
+                          </span>
+                          <span className="sha-with-icon">
+                            <CommitIcon className="commit-hash-icon" />
+                            <code className="sha">{c.shortSha}</code>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               </>
             )}
           </div>
