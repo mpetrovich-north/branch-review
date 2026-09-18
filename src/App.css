@@ -367,6 +367,7 @@ pre,
   border-radius: 8px;
   overflow: visible;
   min-width: 0;
+  scroll-margin-top: var(--topbar-offset);
 }
 
 .diff-file-header {

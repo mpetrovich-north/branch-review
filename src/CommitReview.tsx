@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Comment, CommitSummary, DiffFile, LineComment, LineType } from './types'
 import { createComment, removeComment } from './api'
 
@@ -38,6 +38,17 @@ export function CommitReview({ commit, files, comments, onCommentsChange }: Prop
   const [body, setBody] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const diffPaneRef = useRef<HTMLDivElement>(null)
+
+  function selectFile(path: string) {
+    setActivePath(path)
+    setDraftLine(null)
+    setDraftMessage(false)
+    setBody('')
+    requestAnimationFrame(() => {
+      diffPaneRef.current?.scrollIntoView({ block: 'start' })
+    })
+  }
 
   useEffect(() => {
     setActivePath(files[0]?.path ?? '')
@@ -188,7 +199,7 @@ export function CommitReview({ commit, files, comments, onCommentsChange }: Prop
                   <button
                     type="button"
                     className={f.path === activeFile?.path ? 'active' : ''}
-                    onClick={() => setActivePath(f.path)}
+                    onClick={() => selectFile(f.path)}
                   >
                     <span className={`status status-${f.status}`}>{f.status[0]!.toUpperCase()}</span>
                     <span className="path">{f.path}</span>
@@ -200,7 +211,7 @@ export function CommitReview({ commit, files, comments, onCommentsChange }: Prop
           </ul>
         </aside>
 
-        <div className="diff-pane">
+        <div className="diff-pane" ref={diffPaneRef}>
           {activeFile ? (
             <>
               <div className="diff-file-header">
