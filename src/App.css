@@ -14,16 +14,25 @@
   --removed-bg: #ffebe9;
   --meta-bg: #ddf4ff;
   --comment-bg: #fff8c5;
+  --comment-border: #d4a72c66;
   --danger: #cf222e;
+  --status-added: #1a7f37;
+  --status-modified: #9a6700;
+  --gutter-bg: #f6f8fa;
+  --error-banner-bg: #ffebe9;
+  --error-banner-border: #ffcecb;
   --radius: 4px;
   --mono: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
   --sans: 'IBM Plex Sans', 'Segoe UI', sans-serif;
-  --topbar-offset: 4.25rem;
+  --sticky-top: 0px;
   font-family: var(--sans);
   line-height: 1.4;
   color: var(--text);
   background: var(--surface);
 }
+
+
+
 
 * {
   box-sizing: border-box;
@@ -34,6 +43,7 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
+  background: var(--surface);
 }
 
 button,
@@ -54,24 +64,11 @@ pre,
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-}
-
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  display: flex;
-  justify-content: flex-start;
-  align-items: flex-end;
-  padding: 0.65rem 1rem;
   background: var(--surface);
-  border-bottom: 1px solid var(--border);
 }
 
 .updating-label {
-  align-self: center;
-  font-size: 0.8rem;
-  padding-bottom: 0.1rem;
+  font-size: 0.7rem;
 }
 
 .meta {
@@ -85,42 +82,51 @@ pre,
 }
 
 .branch-controls {
+  flex: 0 0 auto;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 0.65rem;
-  align-items: flex-end;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.55rem 0.65rem 0.65rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .branch-controls .field {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.12rem;
+  min-width: 0;
 }
 
 .branch-controls label {
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   color: var(--muted);
 }
 
 .branch-controls select {
-  min-width: 12rem;
-  max-width: 20rem;
-  padding: 0.3rem 0.45rem;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  padding: 0.28rem 0.4rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.7rem;
 }
 
 .btn {
   border: 1px solid var(--border);
   background: var(--accent);
-  color: #fff;
+  color: #ffffff;
   border-color: var(--accent);
   border-radius: var(--radius);
   padding: 0.3rem 0.65rem;
   cursor: pointer;
   font-size: 0.85rem;
 }
+
+
 
 .btn:hover:not(:disabled) {
   background: var(--accent-hover);
@@ -135,6 +141,7 @@ pre,
 .btn.ghost {
   background: var(--surface);
   color: var(--text);
+  border-color: var(--border);
 }
 
 .btn.ghost:hover:not(:disabled) {
@@ -155,7 +162,7 @@ pre,
 
 .main-layout {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 260px 1fr;
   align-items: start;
   flex: 1;
   min-height: 0;
@@ -167,9 +174,9 @@ pre,
 
 .commit-list {
   position: sticky;
-  top: var(--topbar-offset);
-  height: calc(100vh - var(--topbar-offset));
-  max-height: calc(100vh - var(--topbar-offset));
+  top: var(--sticky-top);
+  height: calc(100vh - var(--sticky-top));
+  max-height: calc(100vh - var(--sticky-top));
   border-right: 1px solid var(--border);
   background: var(--sidebar);
   display: flex;
@@ -182,19 +189,10 @@ pre,
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.35rem;
-  padding: 0.55rem 0.65rem;
-  border-bottom: 1px solid var(--border);
-  min-height: 2.4rem;
-}
-
-.commit-list-header h2 {
-  margin: 0;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--muted);
-  min-width: 0;
+  padding: 0.4rem 0.55rem;
+  min-height: 2rem;
 }
 
 .commit-list-toggle {
@@ -227,7 +225,13 @@ pre,
 .commit-list.is-collapsed .commit-list-header {
   justify-content: center;
   padding: 0.55rem 0.25rem;
-  border-bottom: 0;
+}
+
+.commit-list-count {
+  padding: 0.45rem 0.85rem 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .commit-list-body {
@@ -391,18 +395,18 @@ pre,
   margin: 0;
   white-space: pre-wrap;
   color: var(--text);
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 .commit-body-empty {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 .diff-layout {
   display: grid;
-  grid-template-columns: 210px 1fr;
-  gap: 0.85rem;
+  grid-template-columns: 260px 1fr;
+  gap: 1rem;
   align-items: start;
 }
 
@@ -569,21 +573,21 @@ pre,
   padding: 0.05rem 0.35rem;
   user-select: none;
   border-right: 1px solid var(--border-subtle);
-  background: #f6f8fa;
+  background: var(--gutter-bg);
 }
 
 .diff-line .gutter.sign {
   text-align: center;
   padding: 0.1rem 0;
   font-family: var(--mono);
-  border-right: 1px solid #eff2f5;
+  border-right: 1px solid var(--border-subtle);
 }
 
 .diff-line.added {
   background: var(--added-bg);
 }
 .diff-line.added .gutter.sign {
-  color: #1a7f37;
+  color: var(--status-added);
   background: var(--added-bg);
 }
 .diff-line.removed {
@@ -607,6 +611,7 @@ pre,
   padding: 0.1rem 0.5rem;
   cursor: pointer;
   min-width: 0;
+  color: inherit;
 }
 
 .line-body:disabled {
@@ -625,13 +630,13 @@ pre,
   font-family: var(--mono);
 }
 
-
 .comment-thread {
   background: var(--comment-bg);
-  border: 1px solid #d4a72c66;
+  border: 1px solid var(--comment-border);
   border-radius: var(--radius);
-  padding: 0.55rem 0.65rem;
-  margin: 0.45rem 0;
+  padding: 0.45rem 0.55rem;
+  margin: 0.4rem 0;
+  font-size: 0.78rem;
 }
 
 .comment-thread.inline,
@@ -640,7 +645,9 @@ pre,
 }
 
 .comment-thread p {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.3rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .comment-draft {
@@ -651,8 +658,11 @@ pre,
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.45rem 0.55rem;
+  padding: 0.4rem 0.5rem;
   resize: vertical;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.78rem;
 }
 
 .draft-actions {
@@ -660,6 +670,7 @@ pre,
   gap: 0.5rem;
   margin-top: 0.45rem;
 }
+
 
 .muted {
   color: var(--muted);
@@ -677,14 +688,13 @@ pre,
 .error.banner {
   margin: 0;
   padding: 0.65rem 1.25rem;
-  background: #ffebe9;
-  border-bottom: 1px solid #ffcecb;
+  background: var(--error-banner-bg);
+  border-bottom: 1px solid var(--error-banner-border);
 }
 
 @media (max-width: 900px) {
   .main-layout,
-  .diff-layout,
-  .topbar {
+  .diff-layout {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: stretch;
@@ -699,7 +709,7 @@ pre,
   .file-list {
     position: static;
     height: auto;
-    max-height: 220px;
+    max-height: 280px;
   }
 
   .commit-list {

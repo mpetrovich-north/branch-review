@@ -191,22 +191,6 @@ export default function App() {
   }, [reviewDraft, baseDraft, meta, loadReviewData, repoPath])
 
   useEffect(() => {
-    if (loading) return
-    const el = document.querySelector('.topbar')
-    if (!(el instanceof HTMLElement)) return
-    const apply = () => {
-      document.documentElement.style.setProperty(
-        '--topbar-offset',
-        `${el.getBoundingClientRect().height}px`,
-      )
-    }
-    apply()
-    const ro = new ResizeObserver(apply)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [loading, meta, savingConfig, error, repoPath])
-
-  useEffect(() => {
     if (!selectedSha) {
       setFiles([])
       return
@@ -281,115 +265,116 @@ export default function App() {
   const selected = commits.find((c) => c.sha === selectedSha) ?? null
   const selectedIndex = selected ? commits.findIndex((c) => c.sha === selected.sha) : -1
 
+  const branchControls = (
+    <div className="branch-controls">
+      <div className="field">
+        <label htmlFor="repo-path">Repo</label>
+        <select
+          id="repo-path"
+          value={repoPath ?? ''}
+          onChange={(e) => {
+            void onRepoChange(e.target.value)
+          }}
+        >
+          {repos.map((r) => (
+            <option key={r.path} value={r.path} title={r.path}>
+              {r.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <label htmlFor="review-branch">Review branch</label>
+        <select
+          id="review-branch"
+          value={reviewDraft}
+          onChange={(e) => setReviewDraft(e.target.value)}
+          disabled={!meta}
+        >
+          {reviewDraft && !reviewOptions.includes(reviewDraft) ? (
+            <option value={reviewDraft}>{reviewDraft}</option>
+          ) : null}
+          {reviewOptions.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <label htmlFor="base-branch">Compare to</label>
+        <select
+          id="base-branch"
+          value={baseDraft}
+          onChange={(e) => setBaseDraft(e.target.value)}
+          disabled={!meta}
+        >
+          {baseDraft && !baseOptions.includes(baseDraft) ? (
+            <option value={baseDraft}>{baseDraft}</option>
+          ) : null}
+          {baseOptions.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
+      </div>
+      {savingConfig ? <span className="muted updating-label">Updating…</span> : null}
+    </div>
+  )
+
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <div className="branch-controls">
-          <div className="field">
-            <label htmlFor="repo-path">Repo</label>
-            <select
-              id="repo-path"
-              value={repoPath}
-              onChange={(e) => {
-                void onRepoChange(e.target.value)
-              }}
-            >
-              {repos.map((r) => (
-                <option key={r.path} value={r.path} title={r.path}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="review-branch">Review branch</label>
-            <select
-              id="review-branch"
-              value={reviewDraft}
-              onChange={(e) => setReviewDraft(e.target.value)}
-              disabled={!meta}
-            >
-              {reviewDraft && !reviewOptions.includes(reviewDraft) ? (
-                <option value={reviewDraft}>{reviewDraft}</option>
-              ) : null}
-              {reviewOptions.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="base-branch">Compare to</label>
-            <select
-              id="base-branch"
-              value={baseDraft}
-              onChange={(e) => setBaseDraft(e.target.value)}
-              disabled={!meta}
-            >
-              {baseDraft && !baseOptions.includes(baseDraft) ? (
-                <option value={baseDraft}>{baseDraft}</option>
-              ) : null}
-              {baseOptions.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </div>
-          {savingConfig ? <span className="muted updating-label">Updating…</span> : null}
-        </div>
-      </header>
-
       {error ? <p className="error banner">{error}</p> : null}
 
-      {!meta || !ready ? (
-        <p className="muted setup-wait">
-          {meta ? 'Choose review and compare branches to start.' : 'Loading repository…'}
-        </p>
-      ) : (
-        <div className={`main-layout${commitsCollapsed ? ' commits-collapsed' : ''}`}>
-          <aside className={`commit-list${commitsCollapsed ? ' is-collapsed' : ''}`}>
-            <div className="commit-list-header">
-              {commitsCollapsed ? (
-                <button
-                  type="button"
-                  className="commit-list-toggle"
-                  aria-expanded={false}
-                  aria-controls="commit-list-body"
-                  title="Show commits"
-                  onClick={() => setCommitsCollapsed(false)}
-                >
-                  <span className="commit-list-toggle-icon" aria-hidden="true">
-                    ›
-                  </span>
-                  <span className="visually-hidden">Show commits</span>
-                </button>
-              ) : (
-                <>
-                  <h2>
-                    {commits.length} {commits.length === 1 ? 'commit' : 'commits'}
-                  </h2>
-                  <button
-                    type="button"
-                    className="commit-list-toggle"
-                    aria-expanded={true}
-                    aria-controls="commit-list-body"
-                    title="Hide commits"
-                    onClick={() => setCommitsCollapsed(true)}
-                  >
-                    <span className="commit-list-toggle-icon" aria-hidden="true">
-                      ‹
-                    </span>
-                    <span className="visually-hidden">Hide commits</span>
-                  </button>
-                </>
-              )}
-            </div>
-            <div id="commit-list-body" className="commit-list-body" hidden={commitsCollapsed}>
-              {commits.length === 0 ? (
-                <p className="empty">No commits ahead of the base branch.</p>
-              ) : (
+      <div className={`main-layout${commitsCollapsed ? ' commits-collapsed' : ''}`}>
+        <aside className={`commit-list${commitsCollapsed ? ' is-collapsed' : ''}`}>
+          <div className="commit-list-header">
+            {commitsCollapsed ? (
+              <button
+                type="button"
+                className="commit-list-toggle"
+                aria-expanded={false}
+                aria-controls="commit-list-body"
+                title="Show commits"
+                onClick={() => setCommitsCollapsed(false)}
+              >
+                <span className="commit-list-toggle-icon" aria-hidden="true">
+                  ›
+                </span>
+                <span className="visually-hidden">Show commits</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="commit-list-toggle"
+                aria-expanded={true}
+                aria-controls="commit-list-body"
+                title="Hide commits"
+                onClick={() => setCommitsCollapsed(true)}
+              >
+                <span className="commit-list-toggle-icon" aria-hidden="true">
+                  ‹
+                </span>
+                <span className="visually-hidden">Hide commits</span>
+              </button>
+            )}
+          </div>
+
+          {!commitsCollapsed ? branchControls : null}
+
+          <div id="commit-list-body" className="commit-list-body" hidden={commitsCollapsed}>
+            {!meta || !ready ? (
+              <p className="empty">
+                {meta ? 'Choose review and compare branches to start.' : 'Loading repository…'}
+              </p>
+            ) : commits.length === 0 ? (
+              <p className="empty">No commits ahead of the base branch.</p>
+            ) : (
+              <>
+                <div className="commit-list-count">
+                  {commits.length} {commits.length === 1 ? 'commit' : 'commits'}
+                </div>
                 <ol>
                   {commits.map((c, i) => (
                     <li key={c.sha}>
@@ -405,34 +390,36 @@ export default function App() {
                     </li>
                   ))}
                 </ol>
-              )}
-            </div>
-          </aside>
-
-          <main className="main-pane">
-            {selected ? (
-              diffLoading ? (
-                <p className="muted">Loading diff…</p>
-              ) : (
-                <CommitReview
-                  commit={selected}
-                  files={files}
-                  comments={comments}
-                  onCommentsChange={setComments}
-                  nav={{
-                    index: selectedIndex,
-                    total: commits.length,
-                    onPrev: () => setSelectedSha(commits[selectedIndex - 1]!.sha),
-                    onNext: () => setSelectedSha(commits[selectedIndex + 1]!.sha),
-                  }}
-                />
-              )
-            ) : (
-              <p className="empty">Select a commit to review.</p>
+              </>
             )}
-          </main>
-        </div>
-      )}
+          </div>
+        </aside>
+
+        <main className="main-pane">
+          {!meta || !ready ? (
+            <p className="muted setup-wait">Select a review branch to begin.</p>
+          ) : selected ? (
+            diffLoading ? (
+              <p className="muted">Loading diff…</p>
+            ) : (
+              <CommitReview
+                commit={selected}
+                files={files}
+                comments={comments}
+                onCommentsChange={setComments}
+                nav={{
+                  index: selectedIndex,
+                  total: commits.length,
+                  onPrev: () => setSelectedSha(commits[selectedIndex - 1]!.sha),
+                  onNext: () => setSelectedSha(commits[selectedIndex + 1]!.sha),
+                }}
+              />
+            )
+          ) : (
+            <p className="empty">Select a commit to review.</p>
+          )}
+        </main>
+      </div>
     </div>
   )
 }
