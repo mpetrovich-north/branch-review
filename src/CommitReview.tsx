@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Comment, CommitSummary, DiffFile, LineComment, LineType } from './types'
 import { createComment, removeComment } from './api'
+import { buildFileTree, collectDirPaths, type FileTreeNode } from './fileTree'
 
 type Props = {
   commit: CommitSummary
@@ -64,6 +65,81 @@ function CommentBubbleIcon() {
   )
 }
 
+function FileTree({
+  nodes,
+  depth,
+  activePath,
+  expanded,
+  commentCounts,
+  onToggleDir,
+  onSelectFile,
+}: {
+  nodes: FileTreeNode[]
+  depth: number
+  activePath: string | undefined
+  expanded: Set<string>
+  commentCounts: Map<string, number>
+  onToggleDir: (path: string) => void
+  onSelectFile: (path: string) => void
+}) {
+  return (
+    <ul className={depth === 0 ? 'file-tree' : 'file-tree-nested'} role={depth === 0 ? 'tree' : 'group'}>
+      {nodes.map((node) => {
+        if (node.kind === 'dir') {
+          const isOpen = expanded.has(node.path)
+          return (
+            <li key={`dir:${node.path}`} role="treeitem" aria-expanded={isOpen}>
+              <button
+                type="button"
+                className="file-tree-dir"
+                style={{ paddingLeft: `${0.45 + depth * 0.7}rem` }}
+                aria-expanded={isOpen}
+                onClick={() => onToggleDir(node.path)}
+              >
+                <span className="file-tree-chevron" aria-hidden="true">
+                  {isOpen ? '▾' : '▸'}
+                </span>
+                <span className="file-tree-name">{node.name}/</span>
+              </button>
+              {isOpen ? (
+                <FileTree
+                  nodes={node.children}
+                  depth={depth + 1}
+                  activePath={activePath}
+                  expanded={expanded}
+                  commentCounts={commentCounts}
+                  onToggleDir={onToggleDir}
+                  onSelectFile={onSelectFile}
+                />
+              ) : null}
+            </li>
+          )
+        }
+
+        const count = commentCounts.get(node.path) ?? 0
+        const isActive = node.path === activePath
+        return (
+          <li key={`file:${node.path}`} role="treeitem">
+            <button
+              type="button"
+              className={`file-tree-file${isActive ? ' active' : ''}`}
+              style={{ paddingLeft: `${0.45 + depth * 0.7}rem` }}
+              onClick={() => onSelectFile(node.path)}
+              title={node.path}
+            >
+              <span className={`status status-${node.file.status}`}>
+                {node.file.status[0]!.toUpperCase()}
+              </span>
+              <span className="file-tree-name">{node.name}</span>
+              {count > 0 ? <span className="badge">{count}</span> : null}
+            </button>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 export function CommitReview({
   commit,
   files,
@@ -72,6 +148,7 @@ export function CommitReview({
   nav,
 }: Props) {
   const [activePath, setActivePath] = useState(files[0]?.path ?? '')
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => new Set())
   const [draftLine, setDraftLine] = useState<{
     path: string
     line: number
@@ -83,6 +160,17 @@ export function CommitReview({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const fileTree = useMemo(() => buildFileTree(files), [files])
+
+  const commentCounts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const c of comments) {
+      if (c.kind !== 'line' || c.commitSha !== commit.sha) continue
+      map.set(c.path, (map.get(c.path) ?? 0) + 1)
+    }
+    return map
+  }, [comments, commit.sha])
+
   function selectFile(path: string) {
     setActivePath(path)
     setDraftLine(null)
@@ -91,12 +179,22 @@ export function CommitReview({
     window.scrollTo({ top: 0, behavior: 'auto' })
   }
 
+  function toggleDir(path: string) {
+    setExpandedDirs((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
   useEffect(() => {
     setActivePath(files[0]?.path ?? '')
     setDraftLine(null)
     setDraftMessage(false)
     setBody('')
-  }, [commit.sha, files])
+    setExpandedDirs(new Set(collectDirPaths(fileTree)))
+  }, [commit.sha, files, fileTree])
 
   const activeFile = useMemo(
     () => files.find((f) => f.path === activePath) ?? files[0],
@@ -277,25 +375,22 @@ export function CommitReview({
 
       <div className="diff-layout">
         <aside className="file-list">
-          <h3>Files</h3>
-          <ul>
-            {files.map((f) => {
-              const count = lineComments.filter((c) => c.path === f.path).length
-              return (
-                <li key={f.path}>
-                  <button
-                    type="button"
-                    className={f.path === activeFile?.path ? 'active' : ''}
-                    onClick={() => selectFile(f.path)}
-                  >
-                    <span className={`status status-${f.status}`}>{f.status[0]!.toUpperCase()}</span>
-                    <span className="path">{f.path}</span>
-                    {count > 0 ? <span className="badge">{count}</span> : null}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+          <h3>
+            {files.length} {files.length === 1 ? 'file' : 'files'}
+          </h3>
+          {files.length === 0 ? (
+            <p className="empty">No files in this commit.</p>
+          ) : (
+            <FileTree
+              nodes={fileTree}
+              depth={0}
+              activePath={activeFile?.path}
+              expanded={expandedDirs}
+              commentCounts={commentCounts}
+              onToggleDir={toggleDir}
+              onSelectFile={selectFile}
+            />
+          )}
         </aside>
 
         <div className="diff-pane">
