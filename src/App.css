@@ -76,18 +76,25 @@ pre,
   margin: 0 0.4rem;
 }
 
-.base-control {
+.branch-controls {
   display: flex;
-  gap: 0.5rem;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem 0.75rem;
+  align-items: flex-end;
 }
 
-.base-control label {
-  font-size: 0.85rem;
+.branch-controls .field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.branch-controls label {
+  font-size: 0.8rem;
   color: var(--muted);
 }
 
-.base-control input {
+.branch-controls input {
   min-width: 10rem;
   padding: 0.4rem 0.55rem;
   border: 1px solid var(--border);

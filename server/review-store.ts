@@ -5,10 +5,16 @@ import {
   commentsFileSchema,
   configSchema,
   createCommentSchema,
+  storedConfigSchema,
   type Comment,
   type CommentsFile,
   type ReviewConfig,
 } from './schema.js'
+
+export type StoredConfig = {
+  baseBranch: string
+  reviewBranch?: string
+}
 
 const REVIEW_DIR = '.review'
 const GITIGNORE_CONTENTS = `*
@@ -42,13 +48,17 @@ async function ensureReviewDir(repoPath: string): Promise<void> {
   }
 }
 
-export async function readConfig(repoPath: string): Promise<ReviewConfig | null> {
+export async function readConfig(repoPath: string): Promise<StoredConfig | null> {
   try {
     const raw = await readFile(configPath(repoPath), 'utf8')
-    return configSchema.parse(JSON.parse(raw))
+    return storedConfigSchema.parse(JSON.parse(raw))
   } catch {
     return null
   }
+}
+
+export function isConfigReady(config: StoredConfig | null): config is ReviewConfig {
+  return Boolean(config?.baseBranch && config.reviewBranch)
 }
 
 export async function writeConfig(repoPath: string, config: ReviewConfig): Promise<ReviewConfig> {

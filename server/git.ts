@@ -33,13 +33,11 @@ export async function assertGitRepo(repoPath: string): Promise<void> {
   }
 }
 
-export async function getCurrentBranch(repoPath: string): Promise<string> {
+/** Branch checked out on disk, or null when HEAD is detached. */
+export async function getCheckedOutBranch(repoPath: string): Promise<string | null> {
   const out = await git(repoPath, ['branch', '--show-current'])
   const branch = out.trim()
-  if (!branch) {
-    throw new GitError('Detached HEAD is not supported; check out a branch')
-  }
-  return branch
+  return branch || null
 }
 
 export async function branchExists(repoPath: string, branch: string): Promise<boolean> {
@@ -56,15 +54,11 @@ export async function branchExists(repoPath: string, branch: string): Promise<bo
   }
 }
 
-export function resolveBaseRef(baseBranch: string): string {
-  return baseBranch
-}
-
 async function resolveCommitish(repoPath: string, name: string): Promise<string> {
   try {
-    return (await git(repoPath, ['rev-parse', '--verify', name])).trim()
+    return (await git(repoPath, ['rev-parse', '--verify', `${name}^{commit}`])).trim()
   } catch {
-    return (await git(repoPath, ['rev-parse', '--verify', `origin/${name}`])).trim()
+    return (await git(repoPath, ['rev-parse', '--verify', `origin/${name}^{commit}`])).trim()
   }
 }
 
@@ -81,26 +75,17 @@ export type CommitSummary = {
 export async function listCommitsNotInBase(
   repoPath: string,
   baseBranch: string,
+  reviewBranch: string,
 ): Promise<CommitSummary[]> {
-  await resolveCommitish(repoPath, baseBranch)
-  const range = `${baseBranch}..HEAD`
+  const baseSha = await resolveCommitish(repoPath, baseBranch)
+  const reviewSha = await resolveCommitish(repoPath, reviewBranch)
   const format = ['%H', '%h', '%s', '%b', '%an', '%ae', '%aI'].join('%x1f') + '%x1e'
-  let stdout: string
-  try {
-    stdout = await git(repoPath, [
-      'log',
-      '--reverse',
-      `--format=${format}`,
-      range,
-    ])
-  } catch {
-    stdout = await git(repoPath, [
-      'log',
-      '--reverse',
-      `--format=${format}`,
-      `origin/${baseBranch}..HEAD`,
-    ])
-  }
+  const stdout = await git(repoPath, [
+    'log',
+    '--reverse',
+    `--format=${format}`,
+    `${baseSha}..${reviewSha}`,
+  ])
 
   const records = stdout.split('\x1e').map((r) => r.trim()).filter(Boolean)
   return records.map((record) => {
@@ -254,10 +239,22 @@ export function parseUnifiedDiff(diffText: string): DiffFile[] {
   return files
 }
 
-export async function listLocalBranches(repoPath: string): Promise<string[]> {
-  const stdout = await git(repoPath, ['branch', '--format=%(refname:short)'])
-  return stdout
-    .split('\n')
-    .map((b) => b.trim())
-    .filter(Boolean)
+/** Local and remote-tracking branch names (origin/ prefix stripped). */
+export async function listBranches(repoPath: string): Promise<string[]> {
+  const stdout = await git(repoPath, [
+    'for-each-ref',
+    '--format=%(refname:short)',
+    'refs/heads',
+    'refs/remotes',
+  ])
+  const names = new Set<string>()
+  for (const line of stdout.split('\n')) {
+    let name = line.trim()
+    if (!name || name.endsWith('/HEAD')) continue
+    if (name.startsWith('origin/')) {
+      name = name.slice('origin/'.length)
+    }
+    if (name) names.add(name)
+  }
+  return [...names].sort((a, b) => a.localeCompare(b))
 }

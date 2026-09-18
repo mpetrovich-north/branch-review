@@ -4,9 +4,14 @@ import { CommitReview } from './CommitReview'
 import type { Comment, CommitSummary, DiffFile, MetaResponse } from './types'
 import './App.css'
 
+function configIsReady(config: MetaResponse['config']): boolean {
+  return Boolean(config?.baseBranch && config.reviewBranch)
+}
+
 export default function App() {
   const [meta, setMeta] = useState<MetaResponse | null>(null)
   const [baseDraft, setBaseDraft] = useState('main')
+  const [reviewDraft, setReviewDraft] = useState('')
   const [commits, setCommits] = useState<CommitSummary[]>([])
   const [selectedSha, setSelectedSha] = useState<string | null>(null)
   const [files, setFiles] = useState<DiffFile[]>([])
@@ -34,7 +39,10 @@ export default function App() {
         if (cancelled) return
         setMeta(m)
         setBaseDraft(m.config?.baseBranch ?? m.defaultBaseBranch)
-        if (m.config) {
+        setReviewDraft(
+          m.config?.reviewBranch ?? m.defaultReviewBranch ?? m.checkedOutBranch ?? '',
+        )
+        if (configIsReady(m.config)) {
           await loadReviewData()
         }
       } catch (e) {
@@ -72,11 +80,14 @@ export default function App() {
     }
   }, [selectedSha])
 
-  async function onSaveBase() {
+  async function onSaveConfig() {
     setSavingConfig(true)
     setError(null)
     try {
-      const { config } = await saveConfig({ baseBranch: baseDraft.trim() })
+      const { config } = await saveConfig({
+        baseBranch: baseDraft.trim(),
+        reviewBranch: reviewDraft.trim(),
+      })
       setMeta((m) => (m ? { ...m, config } : m))
       await loadReviewData()
     } catch (e) {
@@ -102,9 +113,16 @@ export default function App() {
     )
   }
 
-  const needsSetup = !meta.config
+  const needsSetup = !configIsReady(meta.config)
   const selected = commits.find((c) => c.sha === selectedSha) ?? null
   const selectedIndex = selected ? commits.findIndex((c) => c.sha === selected.sha) : -1
+  const reviewBranch = meta.config?.reviewBranch
+  const checkedOutNote =
+    meta.checkedOutBranch == null
+      ? 'checked out: detached'
+      : meta.checkedOutBranch === reviewBranch
+        ? `checked out: ${meta.checkedOutBranch}`
+        : `checked out: ${meta.checkedOutBranch} (unchanged)`
 
   return (
     <div className="app-shell">
@@ -114,24 +132,35 @@ export default function App() {
           <p className="meta">
             <span title={meta.repoPath}>{meta.repoPath}</span>
             <span className="sep">·</span>
-            <code>{meta.branch}</code>
+            <span>{checkedOutNote}</span>
           </p>
         </div>
-        <div className="base-control">
-          <label htmlFor="base-branch">Base branch</label>
-          <input
-            id="base-branch"
-            list="branch-options"
-            value={baseDraft}
-            onChange={(e) => setBaseDraft(e.target.value)}
-          />
+        <div className="branch-controls">
+          <div className="field">
+            <label htmlFor="review-branch">Review branch</label>
+            <input
+              id="review-branch"
+              list="branch-options"
+              value={reviewDraft}
+              onChange={(e) => setReviewDraft(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="base-branch">Base branch</label>
+            <input
+              id="base-branch"
+              list="branch-options"
+              value={baseDraft}
+              onChange={(e) => setBaseDraft(e.target.value)}
+            />
+          </div>
           <datalist id="branch-options">
             {meta.branches.map((b) => (
               <option key={b} value={b} />
             ))}
           </datalist>
-          <button type="button" className="btn" disabled={savingConfig} onClick={onSaveBase}>
-            {meta.config ? 'Update' : 'Start review'}
+          <button type="button" className="btn" disabled={savingConfig} onClick={onSaveConfig}>
+            {configIsReady(meta.config) ? 'Update' : 'Start review'}
           </button>
         </div>
       </header>
@@ -140,10 +169,11 @@ export default function App() {
 
       {needsSetup ? (
         <section className="setup">
-          <h2>Choose a base branch</h2>
+          <h2>Choose branches</h2>
           <p>
-            Review commits on <code>{meta.branch}</code> that are not on the base branch. Default is{' '}
-            <code>main</code>. This is saved to <code>.review/config.json</code>.
+            Pick the review branch (commits to inspect) and the base branch (usually{' '}
+            <code>main</code>). The app reads those refs only; it does not check out or change the
+            branch on disk. Saved to <code>.review/config.json</code>.
           </p>
         </section>
       ) : (
@@ -152,7 +182,7 @@ export default function App() {
             <div className="commit-list-header">
               <h2>Commits</h2>
               <span className="muted">
-                {commits.length} vs {meta.config?.baseBranch}
+                {commits.length} on {reviewBranch} vs {meta.config?.baseBranch}
               </span>
             </div>
             {commits.length === 0 ? (

@@ -32,6 +32,12 @@ export type CommentsFile = {
 
 export type ReviewConfig = {
   baseBranch: string
+  reviewBranch: string
+}
+
+export type StoredConfig = {
+  baseBranch: string
+  reviewBranch?: string
 }
 
 export type CommitSummary = {
@@ -60,8 +66,9 @@ export type DiffFile = {
 
 export type MetaResponse = {
   repoPath: string
-  branch: string
-  config: ReviewConfig | null
+  checkedOutBranch: string | null
+  config: StoredConfig | null
   branches: string[]
   defaultBaseBranch: string
+  defaultReviewBranch: string | null
 }

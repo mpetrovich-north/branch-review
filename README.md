@@ -24,10 +24,10 @@ npx tsx server/index.ts /path/to/your/repo
 
 ## Flow
 
-1. Set the **base branch** in the UI (default `main`). Saved to `.review/config.json`.
-2. Review commits that are on the current branch and not on the base branch.
+1. Set **review branch** and **base branch** in the UI (defaults: checked-out branch and `main`). Saved to `.review/config.json`. The app does not check out the review branch.
+2. Review commits on the review branch that are not on the base branch.
 3. Comment on a commit message or on a diff line.
-4. Comments are written to `.review/comments/<branch-slug>.json`.
+4. Comments are written to `.review/comments/<branch-slug>.json` for the **review** branch.
 5. Delete a comment in the UI when it is done (agents may also delete after apply).
 
 ## On-disk layout

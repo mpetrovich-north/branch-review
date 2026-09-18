@@ -4,9 +4,12 @@
 
 ```json
 {
-  "baseBranch": "main"
+  "baseBranch": "main",
+  "reviewBranch": "feat/my-branch"
 }
 ```
+
+`reviewBranch` is the branch whose commits you inspect. The app reads that ref; it does not check out or change the branch on disk.
 
 ## `comments/<branch-slug>.json`
 

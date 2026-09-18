@@ -5,13 +5,20 @@ import express from 'express'
 import {
   assertGitRepo,
   branchExists,
+  getCheckedOutBranch,
   getCommitDiff,
-  getCurrentBranch,
   GitError,
+  listBranches,
   listCommitsNotInBase,
-  listLocalBranches,
 } from './git.js'
-import { addComment, deleteComment, readComments, readConfig, writeConfig } from './review-store.js'
+import {
+  addComment,
+  deleteComment,
+  isConfigReady,
+  readComments,
+  readConfig,
+  writeConfig,
+} from './review-store.js'
 import { configSchema } from './schema.js'
 
 function parseRepoPath(): string {
@@ -45,8 +52,8 @@ app.get(
   '/api/health',
   asyncHandler(async (_req, res) => {
     await assertGitRepo(repoPath)
-    const branch = await getCurrentBranch(repoPath)
-    res.json({ ok: true, repoPath, branch })
+    const checkedOutBranch = await getCheckedOutBranch(repoPath)
+    res.json({ ok: true, repoPath, checkedOutBranch })
   }),
 )
 
@@ -54,15 +61,16 @@ app.get(
   '/api/meta',
   asyncHandler(async (_req, res) => {
     await assertGitRepo(repoPath)
-    const branch = await getCurrentBranch(repoPath)
+    const checkedOutBranch = await getCheckedOutBranch(repoPath)
     const config = await readConfig(repoPath)
-    const branches = await listLocalBranches(repoPath)
+    const branches = await listBranches(repoPath)
     res.json({
       repoPath,
-      branch,
+      checkedOutBranch,
       config,
       branches,
       defaultBaseBranch: 'main',
+      defaultReviewBranch: checkedOutBranch,
     })
   }),
 )
@@ -79,9 +87,16 @@ app.put(
   '/api/config',
   asyncHandler(async (req, res) => {
     const parsed = configSchema.parse(req.body)
-    const exists = await branchExists(repoPath, parsed.baseBranch)
-    if (!exists) {
+    if (!(await branchExists(repoPath, parsed.baseBranch))) {
       res.status(400).json({ error: `Base branch not found: ${parsed.baseBranch}` })
+      return
+    }
+    if (!(await branchExists(repoPath, parsed.reviewBranch))) {
+      res.status(400).json({ error: `Review branch not found: ${parsed.reviewBranch}` })
+      return
+    }
+    if (parsed.baseBranch === parsed.reviewBranch) {
+      res.status(400).json({ error: 'Review branch and base branch must differ' })
       return
     }
     const config = await writeConfig(repoPath, parsed)
@@ -93,12 +108,20 @@ app.get(
   '/api/commits',
   asyncHandler(async (_req, res) => {
     const config = await readConfig(repoPath)
-    if (!config) {
-      res.status(400).json({ error: 'Set baseBranch in config first' })
+    if (!isConfigReady(config)) {
+      res.status(400).json({ error: 'Set reviewBranch and baseBranch in config first' })
       return
     }
-    const commits = await listCommitsNotInBase(repoPath, config.baseBranch)
-    res.json({ baseBranch: config.baseBranch, commits })
+    const commits = await listCommitsNotInBase(
+      repoPath,
+      config.baseBranch,
+      config.reviewBranch,
+    )
+    res.json({
+      baseBranch: config.baseBranch,
+      reviewBranch: config.reviewBranch,
+      commits,
+    })
   }),
 )
 
@@ -115,12 +138,11 @@ app.get(
   '/api/comments',
   asyncHandler(async (_req, res) => {
     const config = await readConfig(repoPath)
-    if (!config) {
-      res.status(400).json({ error: 'Set baseBranch in config first' })
+    if (!isConfigReady(config)) {
+      res.status(400).json({ error: 'Set reviewBranch and baseBranch in config first' })
       return
     }
-    const branch = await getCurrentBranch(repoPath)
-    const file = await readComments(repoPath, branch, config.baseBranch)
+    const file = await readComments(repoPath, config.reviewBranch, config.baseBranch)
     res.json(file)
   }),
 )
@@ -129,12 +151,11 @@ app.post(
   '/api/comments',
   asyncHandler(async (req, res) => {
     const config = await readConfig(repoPath)
-    if (!config) {
-      res.status(400).json({ error: 'Set baseBranch in config first' })
+    if (!isConfigReady(config)) {
+      res.status(400).json({ error: 'Set reviewBranch and baseBranch in config first' })
       return
     }
-    const branch = await getCurrentBranch(repoPath)
-    const file = await addComment(repoPath, branch, config.baseBranch, req.body)
+    const file = await addComment(repoPath, config.reviewBranch, config.baseBranch, req.body)
     res.status(201).json(file)
   }),
 )
@@ -143,12 +164,16 @@ app.delete(
   '/api/comments/:id',
   asyncHandler(async (req, res) => {
     const config = await readConfig(repoPath)
-    if (!config) {
-      res.status(400).json({ error: 'Set baseBranch in config first' })
+    if (!isConfigReady(config)) {
+      res.status(400).json({ error: 'Set reviewBranch and baseBranch in config first' })
       return
     }
-    const branch = await getCurrentBranch(repoPath)
-    const file = await deleteComment(repoPath, branch, config.baseBranch, String(req.params.id))
+    const file = await deleteComment(
+      repoPath,
+      config.reviewBranch,
+      config.baseBranch,
+      String(req.params.id),
+    )
     res.json(file)
   }),
 )
@@ -175,7 +200,7 @@ app.use(
 
 async function main() {
   await assertGitRepo(repoPath)
-  const branch = await getCurrentBranch(repoPath)
+  const checkedOutBranch = await getCheckedOutBranch(repoPath)
 
   const isProd = process.env.NODE_ENV === 'production'
   if (isProd) {
@@ -189,7 +214,7 @@ async function main() {
   app.listen(port, () => {
     console.log(`commit-review listening on http://localhost:${port}`)
     console.log(`repo: ${repoPath}`)
-    console.log(`branch: ${branch}`)
+    console.log(`checked out: ${checkedOutBranch ?? '(detached)'}`)
   })
 }
 

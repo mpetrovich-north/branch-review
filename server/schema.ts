@@ -37,6 +37,13 @@ export const commentsFileSchema = z.object({
 
 export const configSchema = z.object({
   baseBranch: z.string().min(1),
+  reviewBranch: z.string().min(1),
+})
+
+/** Accepts older configs that only stored baseBranch. */
+export const storedConfigSchema = z.object({
+  baseBranch: z.string().min(1),
+  reviewBranch: z.string().min(1).optional(),
 })
 
 export const createLineCommentSchema = z.object({
