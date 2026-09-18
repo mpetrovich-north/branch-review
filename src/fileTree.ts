@@ -38,35 +38,11 @@ function finalize(dir: MutableDir): FileTreeDirNode {
     ...[...dir.dirs.values()].map(finalize),
     ...dir.files.values(),
   ].sort(compareNodes)
-  return collapseSingleChildDirs({
+  return {
     kind: 'dir',
     name: dir.name,
     path: dir.path,
     children,
-  })
-}
-
-/** Fold `a/ → b/ → c/` into `a/b/c/` when each level has one directory child. */
-function collapseSingleChildDirs(node: FileTreeDirNode): FileTreeDirNode {
-  let current = node
-  while (
-    current.children.length === 1 &&
-    current.children[0]!.kind === 'dir' &&
-    current.name !== ''
-  ) {
-    const only = current.children[0] as FileTreeDirNode
-    current = {
-      kind: 'dir',
-      name: `${current.name}/${only.name}`,
-      path: only.path,
-      children: only.children,
-    }
-  }
-  return {
-    ...current,
-    children: current.children.map((child) =>
-      child.kind === 'dir' ? collapseSingleChildDirs(child) : child,
-    ),
   }
 }
 
