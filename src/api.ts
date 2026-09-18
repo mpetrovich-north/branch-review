@@ -29,6 +29,13 @@ export function fetchMeta() {
   return request<MetaResponse>('/api/meta')
 }
 
+export function fetchSuggestedBase(reviewBranch: string) {
+  return request<{
+    reviewBranch: string
+    suggestedBase: import('./types').BaseSuggestion | null
+  }>(`/api/suggest-base?reviewBranch=${encodeURIComponent(reviewBranch)}`)
+}
+
 export function saveConfig(config: ReviewConfig) {
   return request<{ config: ReviewConfig }>('/api/config', {
     method: 'PUT',

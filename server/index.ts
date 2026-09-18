@@ -5,9 +5,11 @@ import express from 'express'
 import {
   assertGitRepo,
   branchExists,
+  detectDefaultBranch,
   getCheckedOutBranch,
   getCommitDiff,
   GitError,
+  inferStackBaseBranch,
   listBranches,
   listCommitsNotInBase,
 } from './git.js'
@@ -64,14 +66,38 @@ app.get(
     const checkedOutBranch = await getCheckedOutBranch(repoPath)
     const config = await readConfig(repoPath)
     const branches = await listBranches(repoPath)
+    const defaultBaseBranch = await detectDefaultBranch(repoPath)
+    const defaultReviewBranch = checkedOutBranch
+    const suggestFor = config?.reviewBranch ?? defaultReviewBranch
+    const suggestedBase = suggestFor
+      ? await inferStackBaseBranch(repoPath, suggestFor)
+      : null
     res.json({
       repoPath,
       checkedOutBranch,
       config,
       branches,
-      defaultBaseBranch: 'main',
-      defaultReviewBranch: checkedOutBranch,
+      defaultBaseBranch,
+      defaultReviewBranch,
+      suggestedBase,
     })
+  }),
+)
+
+app.get(
+  '/api/suggest-base',
+  asyncHandler(async (req, res) => {
+    const reviewBranch = String(req.query.reviewBranch ?? '').trim()
+    if (!reviewBranch) {
+      res.status(400).json({ error: 'reviewBranch query param is required' })
+      return
+    }
+    if (!(await branchExists(repoPath, reviewBranch))) {
+      res.status(400).json({ error: `Review branch not found: ${reviewBranch}` })
+      return
+    }
+    const suggestedBase = await inferStackBaseBranch(repoPath, reviewBranch)
+    res.json({ reviewBranch, suggestedBase })
   }),
 )
 

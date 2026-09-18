@@ -258,3 +258,119 @@ export async function listBranches(repoPath: string): Promise<string[]> {
   }
   return [...names].sort((a, b) => a.localeCompare(b))
 }
+
+export async function detectDefaultBranch(repoPath: string): Promise<string> {
+  try {
+    const sym = (await git(repoPath, ['symbolic-ref', 'refs/remotes/origin/HEAD'])).trim()
+    const short = sym.replace(/^refs\/remotes\/origin\//, '')
+    if (short) return short
+  } catch {
+    // fall through
+  }
+  for (const name of ['main', 'master']) {
+    if (await branchExists(repoPath, name)) return name
+  }
+  return 'main'
+}
+
+export type BaseSuggestion = {
+  baseBranch: string
+  kind: 'stack' | 'default' | 'upstream'
+  detail: string
+}
+
+/**
+ * Infer a PR-style base for reviewBranch without checking it out.
+ * Prefers: upstream tracking → nearest stacked local parent → default branch.
+ */
+export async function inferStackBaseBranch(
+  repoPath: string,
+  reviewBranch: string,
+): Promise<BaseSuggestion | null> {
+  const defaultBranch = await detectDefaultBranch(repoPath)
+
+  let reviewSha: string
+  try {
+    reviewSha = await resolveCommitish(repoPath, reviewBranch)
+  } catch {
+    return null
+  }
+
+  try {
+    const upstream = (
+      await git(repoPath, ['rev-parse', '--abbrev-ref', `${reviewBranch}@{upstream}`])
+    ).trim()
+    const name = upstream.replace(/^origin\//, '')
+    if (name && name !== reviewBranch && (await branchExists(repoPath, name))) {
+      return {
+        baseBranch: name,
+        kind: name === defaultBranch ? 'default' : 'upstream',
+        detail: `tracks ${upstream}`,
+      }
+    }
+  } catch {
+    // no upstream configured
+  }
+
+  let defaultSha: string
+  try {
+    defaultSha = await resolveCommitish(repoPath, defaultBranch)
+  } catch {
+    return {
+      baseBranch: defaultBranch,
+      kind: 'default',
+      detail: `default branch ${defaultBranch}`,
+    }
+  }
+
+  const locals = (await git(repoPath, ['for-each-ref', '--format=%(refname:short)', 'refs/heads']))
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  type Cand = { name: string; fromDefault: number; ahead: number }
+  const cands: Cand[] = []
+
+  for (const name of locals) {
+    if (name === reviewBranch) continue
+    try {
+      const tip = (await git(repoPath, ['rev-parse', `${name}^{commit}`])).trim()
+      await git(repoPath, ['merge-base', '--is-ancestor', tip, reviewSha])
+      const fromDefault = Number(
+        (await git(repoPath, ['rev-list', '--count', `${defaultSha}..${tip}`])).trim(),
+      )
+      const ahead = Number(
+        (await git(repoPath, ['rev-list', '--count', `${tip}..${reviewSha}`])).trim(),
+      )
+      if (ahead === 0) continue
+      cands.push({ name, fromDefault, ahead })
+    } catch {
+      // not an ancestor of the review tip
+    }
+  }
+
+  if (cands.length === 0) {
+    return {
+      baseBranch: defaultBranch,
+      kind: 'default',
+      detail: `no stacked parent found; using ${defaultBranch}`,
+    }
+  }
+
+  cands.sort((a, b) => b.fromDefault - a.fromDefault || a.ahead - b.ahead)
+  const best = cands[0]!
+  if (best.name === defaultBranch) {
+    return {
+      baseBranch: defaultBranch,
+      kind: 'default',
+      detail: `default branch ${defaultBranch}`,
+    }
+  }
+
+  return {
+    baseBranch: best.name,
+    kind: 'stack',
+    detail: `${best.ahead} commit(s) ahead of ${best.name}`,
+  }
+}
+

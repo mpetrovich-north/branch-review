@@ -1,17 +1,32 @@
-import { useCallback, useEffect, useState } from 'react'
-import { fetchComments, fetchCommits, fetchDiff, fetchMeta, saveConfig } from './api'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  fetchComments,
+  fetchCommits,
+  fetchDiff,
+  fetchMeta,
+  fetchSuggestedBase,
+  saveConfig,
+} from './api'
 import { CommitReview } from './CommitReview'
-import type { Comment, CommitSummary, DiffFile, MetaResponse } from './types'
+import type { BaseSuggestion, Comment, CommitSummary, DiffFile, MetaResponse } from './types'
 import './App.css'
 
 function configIsReady(config: MetaResponse['config']): boolean {
   return Boolean(config?.baseBranch && config.reviewBranch)
 }
 
+function withBranch(branches: string[], extra: string | null | undefined): string[] {
+  if (!extra) return branches
+  if (branches.includes(extra)) return branches
+  return [extra, ...branches]
+}
+
 export default function App() {
   const [meta, setMeta] = useState<MetaResponse | null>(null)
   const [baseDraft, setBaseDraft] = useState('main')
   const [reviewDraft, setReviewDraft] = useState('')
+  const [baseTouched, setBaseTouched] = useState(false)
+  const [suggestion, setSuggestion] = useState<BaseSuggestion | null>(null)
   const [commits, setCommits] = useState<CommitSummary[]>([])
   const [selectedSha, setSelectedSha] = useState<string | null>(null)
   const [files, setFiles] = useState<DiffFile[]>([])
@@ -38,12 +53,19 @@ export default function App() {
         const m = await fetchMeta()
         if (cancelled) return
         setMeta(m)
-        setBaseDraft(m.config?.baseBranch ?? m.defaultBaseBranch)
-        setReviewDraft(
-          m.config?.reviewBranch ?? m.defaultReviewBranch ?? m.checkedOutBranch ?? '',
-        )
+        const review =
+          m.config?.reviewBranch ?? m.defaultReviewBranch ?? m.checkedOutBranch ?? ''
+        setReviewDraft(review)
         if (configIsReady(m.config)) {
+          setBaseDraft(m.config!.baseBranch)
+          setBaseTouched(true)
+          setSuggestion(m.suggestedBase)
           await loadReviewData()
+        } else {
+          const suggested = m.suggestedBase?.baseBranch ?? m.defaultBaseBranch
+          setBaseDraft(suggested)
+          setBaseTouched(false)
+          setSuggestion(m.suggestedBase)
         }
       } catch (e) {
         if (!cancelled) {
@@ -57,6 +79,28 @@ export default function App() {
       cancelled = true
     }
   }, [loadReviewData])
+
+  useEffect(() => {
+    if (!reviewDraft.trim()) return
+    let cancelled = false
+    const handle = window.setTimeout(() => {
+      fetchSuggestedBase(reviewDraft.trim())
+        .then((res) => {
+          if (cancelled) return
+          setSuggestion(res.suggestedBase)
+          if (!baseTouched && res.suggestedBase) {
+            setBaseDraft(res.suggestedBase.baseBranch)
+          }
+        })
+        .catch(() => {
+          /* keep prior suggestion */
+        })
+    }, 200)
+    return () => {
+      cancelled = true
+      window.clearTimeout(handle)
+    }
+  }, [reviewDraft, baseTouched])
 
   useEffect(() => {
     if (!selectedSha) {
@@ -80,6 +124,34 @@ export default function App() {
     }
   }, [selectedSha])
 
+  const reviewOptions = useMemo(
+    () => withBranch(meta?.branches ?? [], reviewDraft),
+    [meta?.branches, reviewDraft],
+  )
+
+  const baseOptions = useMemo(() => {
+    let list = withBranch(meta?.branches ?? [], baseDraft)
+    if (suggestion?.baseBranch) {
+      list = [suggestion.baseBranch, ...list.filter((b) => b !== suggestion.baseBranch)]
+    }
+    if (meta?.defaultBaseBranch) {
+      list = [
+        meta.defaultBaseBranch,
+        ...list.filter((b) => b !== meta.defaultBaseBranch && b !== suggestion?.baseBranch),
+      ]
+      if (suggestion?.baseBranch && suggestion.baseBranch !== meta.defaultBaseBranch) {
+        list = [
+          suggestion.baseBranch,
+          meta.defaultBaseBranch,
+          ...list.filter(
+            (b) => b !== suggestion.baseBranch && b !== meta.defaultBaseBranch,
+          ),
+        ]
+      }
+    }
+    return list
+  }, [meta?.branches, meta?.defaultBaseBranch, baseDraft, suggestion?.baseBranch])
+
   async function onSaveConfig() {
     setSavingConfig(true)
     setError(null)
@@ -89,12 +161,19 @@ export default function App() {
         reviewBranch: reviewDraft.trim(),
       })
       setMeta((m) => (m ? { ...m, config } : m))
+      setBaseTouched(true)
       await loadReviewData()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save config')
     } finally {
       setSavingConfig(false)
     }
+  }
+
+  function applySuggestion() {
+    if (!suggestion) return
+    setBaseDraft(suggestion.baseBranch)
+    setBaseTouched(false)
   }
 
   if (loading) {
@@ -138,32 +217,66 @@ export default function App() {
         <div className="branch-controls">
           <div className="field">
             <label htmlFor="review-branch">Review branch</label>
-            <input
+            <select
               id="review-branch"
-              list="branch-options"
               value={reviewDraft}
-              onChange={(e) => setReviewDraft(e.target.value)}
-            />
+              onChange={(e) => {
+                setReviewDraft(e.target.value)
+                setBaseTouched(false)
+              }}
+            >
+              {reviewDraft && !reviewOptions.includes(reviewDraft) ? (
+                <option value={reviewDraft}>{reviewDraft}</option>
+              ) : null}
+              {reviewOptions.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="field">
             <label htmlFor="base-branch">Base branch</label>
-            <input
+            <select
               id="base-branch"
-              list="branch-options"
               value={baseDraft}
-              onChange={(e) => setBaseDraft(e.target.value)}
-            />
+              onChange={(e) => {
+                setBaseDraft(e.target.value)
+                setBaseTouched(true)
+              }}
+            >
+              {baseDraft && !baseOptions.includes(baseDraft) ? (
+                <option value={baseDraft}>{baseDraft}</option>
+              ) : null}
+              {baseOptions.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                  {suggestion?.baseBranch === b ? ' (suggested)' : ''}
+                </option>
+              ))}
+            </select>
           </div>
-          <datalist id="branch-options">
-            {meta.branches.map((b) => (
-              <option key={b} value={b} />
-            ))}
-          </datalist>
           <button type="button" className="btn" disabled={savingConfig} onClick={onSaveConfig}>
             {configIsReady(meta.config) ? 'Update' : 'Start review'}
           </button>
         </div>
       </header>
+
+      {suggestion ? (
+        <p className="suggest-banner">
+          Suggested base for <code>{reviewDraft}</code>: <code>{suggestion.baseBranch}</code>
+          <span className="sep">·</span>
+          {suggestion.detail}
+          {baseDraft !== suggestion.baseBranch ? (
+            <>
+              <span className="sep">·</span>
+              <button type="button" className="btn link" onClick={applySuggestion}>
+                Use suggestion
+              </button>
+            </>
+          ) : null}
+        </p>
+      ) : null}
 
       {error ? <p className="error banner">{error}</p> : null}
 
@@ -171,9 +284,10 @@ export default function App() {
         <section className="setup">
           <h2>Choose branches</h2>
           <p>
-            Pick the review branch (commits to inspect) and the base branch (usually{' '}
-            <code>main</code>). The app reads those refs only; it does not check out or change the
-            branch on disk. Saved to <code>.review/config.json</code>.
+            Pick the review branch (commits to inspect) and the base branch. For stacked work, the
+            base is inferred when possible (parent branch tip that is an ancestor of the review
+            branch). The app reads those refs only; it does not check out or change the branch on
+            disk. Saved to <code>.review/config.json</code>.
           </p>
         </section>
       ) : (

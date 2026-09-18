@@ -64,6 +64,12 @@ export type DiffFile = {
   lines: DiffLine[]
 }
 
+export type BaseSuggestion = {
+  baseBranch: string
+  kind: 'stack' | 'default' | 'upstream'
+  detail: string
+}
+
 export type MetaResponse = {
   repoPath: string
   checkedOutBranch: string | null
@@ -71,4 +77,5 @@ export type MetaResponse = {
   branches: string[]
   defaultBaseBranch: string
   defaultReviewBranch: string | null
+  suggestedBase: BaseSuggestion | null
 }

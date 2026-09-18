@@ -94,12 +94,23 @@ pre,
   color: var(--muted);
 }
 
-.branch-controls input {
-  min-width: 10rem;
+.branch-controls input,
+.branch-controls select {
+  min-width: 14rem;
+  max-width: 22rem;
   padding: 0.4rem 0.55rem;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
+}
+
+.suggest-banner {
+  margin: 0;
+  padding: 0.55rem 1.25rem;
+  background: #ddf4ff;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--text);
 }
 
 .btn {
