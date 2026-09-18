@@ -350,8 +350,9 @@ async function main() {
   if (isProd) {
     const dist = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist')
     app.use(express.static(dist))
+    // Express 5's sendFile rejects absolute paths; pass a root-relative name.
     app.get(/.*/, (_req, res) => {
-      res.sendFile(path.join(dist, 'index.html'))
+      res.sendFile('index.html', { root: dist })
     })
   }
 
