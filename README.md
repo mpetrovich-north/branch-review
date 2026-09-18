@@ -13,19 +13,23 @@ npm run build
 npm start
 ```
 
-Open http://localhost:8787 and pick a **Repo** in the header (git repos under `~/Code` by default).
+Open http://localhost:8787 and pick a **Repo** in the header.
+
+By default the app scans the **current directory**, or the **parent of the
+current/preferred git repo** (so sibling clones appear). Override with
+`REPO_ROOT` / `REPO_ROOTS` when needed.
 
 Optional:
 
 ```bash
-# Scan a different folder for repos
-REPO_ROOT=/path/to/projects npm start
-
 # Prefer a repo on first load (still switchable in the UI)
 REPO_PATH=/path/to/your/repo npm start
 
+# Explicit scan folder
+REPO_ROOT=/path/to/projects npm start
+
 # Dev (Vite UI on :5173, API on :8787)
-REPO_ROOT=~/Code npm run dev
+npm run dev
 ```
 
 ## Flow
@@ -61,7 +65,7 @@ See [docs/SCHEMA.md](docs/SCHEMA.md).
 
 | Variable | Purpose |
 | --- | --- |
-| `REPO_ROOT` / `REPO_ROOTS` | Folder(s) to scan for git repos (default `~/Code`; comma-separated for several) |
+| `REPO_ROOT` / `REPO_ROOTS` | Folder(s) to scan for git repos (default: cwd, or parent of cwd/preferred repo; comma-separated for several) |
 | `REPO_PATH` | Optional preferred repo for first load |
 | `PORT` | API/UI port (default `8787`) |
 

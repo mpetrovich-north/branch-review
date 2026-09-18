@@ -1,11 +1,30 @@
+import { existsSync } from 'node:fs'
 import { readdir, access } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import path from 'node:path'
 import { assertGitRepo } from './git.js'
 
 export type RepoInfo = {
   path: string
   name: string
+}
+
+export function parsePreferredRepo(): string | null {
+  const fromEnv = process.env.REPO_PATH
+  const fromArg = process.argv.slice(2).find((a) => !a.startsWith('-'))
+  const raw = fromArg ?? fromEnv
+  return raw ? path.resolve(raw) : null
+}
+
+/** Parent of a repo, or cwd when cwd is not itself a git work tree. */
+export function defaultRepoRoot(): string {
+  const preferred = parsePreferredRepo()
+  if (preferred) return path.dirname(preferred)
+
+  const cwd = process.cwd()
+  if (existsSync(path.join(cwd, '.git'))) {
+    return path.dirname(cwd)
+  }
+  return cwd
 }
 
 export function parseRepoRoots(): string[] {
@@ -16,15 +35,7 @@ export function parseRepoRoots(): string[] {
       .map((s) => path.resolve(s.trim()))
       .filter(Boolean)
   }
-  const code = path.join(homedir(), 'Code')
-  return [code]
-}
-
-export function parsePreferredRepo(): string | null {
-  const fromEnv = process.env.REPO_PATH
-  const fromArg = process.argv.slice(2).find((a) => !a.startsWith('-'))
-  const raw = fromArg ?? fromEnv
-  return raw ? path.resolve(raw) : null
+  return [defaultRepoRoot()]
 }
 
 async function isGitWorkTree(dir: string): Promise<boolean> {
