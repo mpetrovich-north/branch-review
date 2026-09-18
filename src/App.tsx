@@ -12,7 +12,7 @@ import {
   setActiveRepoPath,
 } from './api'
 import { CommitReview } from './CommitReview'
-import { MoonIcon, SunIcon } from './icons'
+import { CommitIcon, MoonIcon, SunIcon } from './icons'
 import { effectiveTheme, toggleStoredTheme, type ThemePreference } from './theme'
 import type {
   BaseSuggestion,
@@ -355,19 +355,22 @@ export default function App() {
                 <span className="visually-hidden">Show commits</span>
               </button>
             ) : (
-              <button
-                type="button"
-                className="commit-list-toggle"
-                aria-expanded={true}
-                aria-controls="commit-list-body"
-                title="Hide commits"
-                onClick={() => setCommitsCollapsed(true)}
-              >
-                <span className="commit-list-toggle-icon" aria-hidden="true">
-                  ‹
-                </span>
-                <span className="visually-hidden">Hide commits</span>
-              </button>
+              <>
+                <h1 className="commit-list-title">Branch Review</h1>
+                <button
+                  type="button"
+                  className="commit-list-toggle"
+                  aria-expanded={true}
+                  aria-controls="commit-list-body"
+                  title="Hide commits"
+                  onClick={() => setCommitsCollapsed(true)}
+                >
+                  <span className="commit-list-toggle-icon" aria-hidden="true">
+                    ‹
+                  </span>
+                  <span className="visually-hidden">Hide commits</span>
+                </button>
+              </>
             )}
           </div>
 
@@ -395,7 +398,10 @@ export default function App() {
                       >
                         <span className="idx">{i + 1}</span>
                         <span className="subject">{c.subject}</span>
-                        <code className="sha">{c.shortSha}</code>
+                        <span className="sha-with-icon">
+                          <CommitIcon className="commit-hash-icon" />
+                          <code className="sha">{c.shortSha}</code>
+                        </span>
                       </button>
                     </li>
                   ))}

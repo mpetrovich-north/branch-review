@@ -1,8 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { Comment, CommitSummary, DiffFile, LineComment, LineType } from './types'
-import { createComment, removeComment } from './api'
+import type {
+  Comment,
+  CommitSummary,
+  DiffFile,
+  FileComment,
+  LineComment,
+  LineType,
+} from './types'
+import { createComment, removeComment, updateComment } from './api'
 import { buildFileTree, collectDirPaths, type FileTreeNode } from './fileTree'
-import { FileIcon, FolderIcon, StatusIcon } from './icons'
+import {
+  CommentBubbleIcon,
+  CommitIcon,
+  FileIcon,
+  FolderIcon,
+  StatusIcon,
+} from './icons'
 
 type Props = {
   commit: CommitSummary
@@ -46,23 +59,87 @@ function formatCommitTime(iso: string): string {
   })
 }
 
-function CommentBubbleIcon() {
+function EditableComment({
+  comment,
+  busy,
+  onSave,
+  onDelete,
+  className,
+}: {
+  comment: Comment
+  busy: boolean
+  onSave: (id: string, body: string) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+  className?: string
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(comment.body)
+
+  useEffect(() => {
+    if (!editing) setDraft(comment.body)
+  }, [comment.body, editing])
+
+  async function save() {
+    if (!draft.trim() || draft.trim() === comment.body) {
+      setEditing(false)
+      setDraft(comment.body)
+      return
+    }
+    await onSave(comment.id, draft.trim())
+    setEditing(false)
+  }
+
   return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        d="M2.5 2.75h11a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H7.2L4 14.25v-2.999H2.5a1 1 0 0 1-1-1v-6.5a1 1 0 0 1 1-1Z"
-        stroke="currentColor"
-        strokeWidth="1.25"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <div className={className ? `comment-thread ${className}` : 'comment-thread'}>
+      {editing ? (
+        <>
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={3}
+            autoFocus
+          />
+          <div className="draft-actions">
+            <button type="button" className="btn" disabled={busy} onClick={() => void save()}>
+              Save
+            </button>
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={busy}
+              onClick={() => {
+                setEditing(false)
+                setDraft(comment.body)
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p>{comment.body}</p>
+          <div className="comment-actions">
+            <button
+              type="button"
+              className="btn link"
+              disabled={busy}
+              onClick={() => setEditing(true)}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              className="btn link"
+              disabled={busy}
+              onClick={() => void onDelete(comment.id)}
+            >
+              Delete
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -88,6 +165,7 @@ function FileTree({
       {nodes.map((node) => {
         if (node.kind === 'dir') {
           const isOpen = expanded.has(node.path)
+          const railLeft = `${0.45 + depth * 0.7 + 0.28}rem`
           return (
             <li key={`dir:${node.path}`} role="treeitem" aria-expanded={isOpen}>
               <button
@@ -104,15 +182,18 @@ function FileTree({
                 <span className="file-tree-name">{node.name}/</span>
               </button>
               {isOpen ? (
-                <FileTree
-                  nodes={node.children}
-                  depth={depth + 1}
-                  activePath={activePath}
-                  expanded={expanded}
-                  commentCounts={commentCounts}
-                  onToggleDir={onToggleDir}
-                  onSelectFile={onSelectFile}
-                />
+                <div className="file-tree-children">
+                  <span className="file-tree-rail" style={{ left: railLeft }} aria-hidden="true" />
+                  <FileTree
+                    nodes={node.children}
+                    depth={depth + 1}
+                    activePath={activePath}
+                    expanded={expanded}
+                    commentCounts={commentCounts}
+                    onToggleDir={onToggleDir}
+                    onSelectFile={onSelectFile}
+                  />
+                </div>
               ) : null}
             </li>
           )
@@ -127,13 +208,18 @@ function FileTree({
               className={`file-tree-file${isActive ? ' active' : ''}`}
               style={{ paddingLeft: `${0.45 + depth * 0.7}rem` }}
               onClick={() => onSelectFile(node.path)}
-              title={node.path}
             >
+              <span className="file-tree-chevron file-tree-chevron-spacer" aria-hidden="true" />
               <span className={`status status-${node.file.status}`}>
                 <StatusIcon status={node.file.status} />
               </span>
               <FileIcon className="file-tree-icon" />
-              <span className="file-tree-name">{node.name}</span>
+              <span className="file-tree-name-wrap">
+                <span className="file-tree-name">{node.name}</span>
+                <span className="file-tree-name-full" aria-hidden="true">
+                  {node.name}
+                </span>
+              </span>
               {count > 0 ? <span className="badge">{count}</span> : null}
             </button>
           </li>
@@ -158,7 +244,8 @@ export function CommitReview({
     lineType: LineType
     snippet: string
   } | null>(null)
-  const [draftMessage, setDraftMessage] = useState(false)
+  const [draftCommit, setDraftCommit] = useState(false)
+  const [draftFile, setDraftFile] = useState(false)
   const [body, setBody] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -168,17 +255,24 @@ export function CommitReview({
   const commentCounts = useMemo(() => {
     const map = new Map<string, number>()
     for (const c of comments) {
-      if (c.kind !== 'line' || c.commitSha !== commit.sha) continue
-      map.set(c.path, (map.get(c.path) ?? 0) + 1)
+      if (c.commitSha !== commit.sha) continue
+      if (c.kind === 'line' || c.kind === 'file') {
+        map.set(c.path, (map.get(c.path) ?? 0) + 1)
+      }
     }
     return map
   }, [comments, commit.sha])
 
+  function clearDrafts() {
+    setDraftLine(null)
+    setDraftCommit(false)
+    setDraftFile(false)
+    setBody('')
+  }
+
   function selectFile(path: string) {
     setActivePath(path)
-    setDraftLine(null)
-    setDraftMessage(false)
-    setBody('')
+    clearDrafts()
     window.scrollTo({ top: 0, behavior: 'auto' })
   }
 
@@ -193,9 +287,7 @@ export function CommitReview({
 
   useEffect(() => {
     setActivePath(files[0]?.path ?? '')
-    setDraftLine(null)
-    setDraftMessage(false)
-    setBody('')
+    clearDrafts()
     setExpandedDirs(new Set(collectDirPaths(fileTree)))
   }, [commit.sha, files, fileTree])
 
@@ -204,11 +296,15 @@ export function CommitReview({
     [files, activePath],
   )
 
-  const commitMessageComments = comments.filter(
-    (c) => c.kind === 'commit_message' && c.commitSha === commit.sha,
+  const commitComments = comments.filter(
+    (c) => c.kind === 'commit' && c.commitSha === commit.sha,
   )
   const lineComments = comments.filter(
     (c): c is LineComment => c.kind === 'line' && c.commitSha === commit.sha,
+  )
+  const fileComments = comments.filter(
+    (c): c is FileComment =>
+      c.kind === 'file' && c.commitSha === commit.sha && c.path === activeFile?.path,
   )
 
   async function submitLine() {
@@ -229,8 +325,7 @@ export function CommitReview({
       }
       const file = await createComment(payload)
       onCommentsChange(file.comments)
-      setBody('')
-      setDraftLine(null)
+      clearDrafts()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save comment')
     } finally {
@@ -238,21 +333,53 @@ export function CommitReview({
     }
   }
 
-  async function submitCommitMessage() {
+  async function submitCommit() {
     if (!body.trim()) return
     setBusy(true)
     setError(null)
     try {
       const file = await createComment({
-        kind: 'commit_message',
+        kind: 'commit',
         commitSha: commit.sha,
         body: body.trim(),
       })
       onCommentsChange(file.comments)
-      setBody('')
-      setDraftMessage(false)
+      clearDrafts()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save comment')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function submitFile() {
+    if (!activeFile || !body.trim()) return
+    setBusy(true)
+    setError(null)
+    try {
+      const file = await createComment({
+        kind: 'file',
+        commitSha: commit.sha,
+        path: activeFile.path,
+        body: body.trim(),
+      })
+      onCommentsChange(file.comments)
+      clearDrafts()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save comment')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onEdit(id: string, nextBody: string) {
+    setBusy(true)
+    setError(null)
+    try {
+      const file = await updateComment(id, nextBody)
+      onCommentsChange(file.comments)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update comment')
     } finally {
       setBusy(false)
     }
@@ -278,101 +405,89 @@ export function CommitReview({
           <div className="commit-title-block">
             <h2>{commit.subject}</h2>
             <p className="meta">
-              <code className="sha">{commit.shortSha}</code>
+              <span className="sha-with-icon">
+                <CommitIcon className="commit-hash-icon" />
+                <code className="sha">{commit.shortSha}</code>
+              </span>
               <span className="sep">·</span>
               {commit.authorName}
               <span className="sep">·</span>
               {formatCommitTime(commit.authoredAt)}
             </p>
           </div>
-          <div className="commit-nav">
+          <div className="commit-nav-group">
             <button
               type="button"
-              className="btn ghost"
-              disabled={nav.index <= 0}
-              onClick={nav.onPrev}
+              className="comment-bubble"
+              title="Comment on commit"
+              aria-label="Comment on commit"
+              onClick={() => {
+                setDraftCommit(true)
+                setDraftLine(null)
+                setDraftFile(false)
+                setBody('')
+              }}
             >
-              Previous
+              <CommentBubbleIcon />
             </button>
-            <span className="muted">
-              {nav.index + 1} / {nav.total}
-            </span>
-            <button
-              type="button"
-              className="btn ghost"
-              disabled={nav.index < 0 || nav.index >= nav.total - 1}
-              onClick={nav.onNext}
-            >
-              Next
-            </button>
+            <div className="commit-nav">
+              <button
+                type="button"
+                className="btn ghost"
+                disabled={nav.index <= 0}
+                onClick={nav.onPrev}
+              >
+                Previous
+              </button>
+              <span className="muted">
+                {nav.index + 1} / {nav.total}
+              </span>
+              <button
+                type="button"
+                className="btn ghost"
+                disabled={nav.index < 0 || nav.index >= nav.total - 1}
+                onClick={nav.onNext}
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="commit-message-row">
-          <button
-            type="button"
-            className="comment-bubble"
-            title="Comment on commit message"
-            aria-label="Comment on commit message"
-            onClick={() => {
-              setDraftMessage(true)
-              setDraftLine(null)
-              setBody('')
-            }}
-          >
-            <CommentBubbleIcon />
-          </button>
-          <div className="commit-message-content">
-            {commit.body ? (
-              <pre className="commit-body">{commit.body}</pre>
-            ) : (
-              <p className="muted commit-body-empty">No message body</p>
-            )}
-            {commitMessageComments.map((c) => (
-              <div key={c.id} className="comment-thread">
-                <p>{c.body}</p>
-                <button
-                  type="button"
-                  className="btn link"
-                  disabled={busy}
-                  onClick={() => onDelete(c.id)}
-                >
-                  Delete
+        <div className="commit-message-content">
+          {commit.body ? (
+            <pre className="commit-body">{commit.body}</pre>
+          ) : (
+            <p className="muted commit-body-empty">No message body</p>
+          )}
+          {commitComments.map((c) => (
+            <EditableComment
+              key={c.id}
+              comment={c}
+              busy={busy}
+              onSave={onEdit}
+              onDelete={onDelete}
+            />
+          ))}
+          {draftCommit ? (
+            <div className="comment-draft">
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                placeholder="Comment on this commit"
+                rows={3}
+                autoFocus
+              />
+              <div className="draft-actions">
+                <button type="button" className="btn" disabled={busy} onClick={() => void submitCommit()}>
+                  Save comment
+                </button>
+                <button type="button" className="btn ghost" onClick={clearDrafts}>
+                  Cancel
                 </button>
               </div>
-            ))}
-            {draftMessage ? (
-              <div className="comment-draft">
-                <textarea
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder="Comment on this commit message"
-                  rows={3}
-                  autoFocus
-                />
-                <div className="draft-actions">
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={busy}
-                    onClick={submitCommitMessage}
-                  >
-                    Save comment
-                  </button>
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    onClick={() => {
-                      setDraftMessage(false)
-                      setBody('')
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -400,17 +515,64 @@ export function CommitReview({
           {activeFile ? (
             <>
               <div className="diff-file-header">
-                <strong>{activeFile.path}</strong>
-                <span className="muted">{activeFile.status}</span>
+                <div className="diff-file-title">
+                  <span className={`status status-${activeFile.status}`}>
+                    <StatusIcon status={activeFile.status} />
+                  </span>
+                  <FileIcon className="diff-file-icon" />
+                  <strong>{activeFile.path}</strong>
+                </div>
+                <button
+                  type="button"
+                  className="comment-bubble"
+                  title="Comment on file"
+                  aria-label="Comment on file"
+                  onClick={() => {
+                    setDraftFile(true)
+                    setDraftCommit(false)
+                    setDraftLine(null)
+                    setBody('')
+                  }}
+                >
+                  <CommentBubbleIcon />
+                </button>
               </div>
+              {fileComments.map((c) => (
+                <EditableComment
+                  key={c.id}
+                  comment={c}
+                  busy={busy}
+                  onSave={onEdit}
+                  onDelete={onDelete}
+                  className="file-level"
+                />
+              ))}
+              {draftFile ? (
+                <div className="comment-draft file-level">
+                  <textarea
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    placeholder="Comment on this file"
+                    rows={3}
+                    autoFocus
+                  />
+                  <div className="draft-actions">
+                    <button type="button" className="btn" disabled={busy} onClick={() => void submitFile()}>
+                      Save comment
+                    </button>
+                    <button type="button" className="btn ghost" onClick={clearDrafts}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <div className="unified-diff">
                 {activeFile.lines.map((line, idx) => {
                   if (line.type === 'meta') {
                     return (
                       <div key={idx} className="diff-line meta">
-                        <span className="gutter" />
-                        <span className="gutter" />
-                        <span className="gutter sign" />
+                        <span className="gutter gutter-old" />
+                        <span className="gutter gutter-new" />
                         <pre className="line-code">{line.content}</pre>
                       </div>
                     )
@@ -421,16 +583,29 @@ export function CommitReview({
                     matchesLineComment(c, activeFile.path, line),
                   )
                   const canComment = lineNo !== null
-                  const sign =
-                    line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '
 
                   return (
                     <div key={idx} className="diff-line-block">
                       <div className={`diff-line ${line.type}`}>
-                        <span className="gutter">{line.oldLine ?? ''}</span>
-                        <span className="gutter">{line.newLine ?? ''}</span>
-                        <span className="gutter sign" aria-hidden="true">
-                          {sign}
+                        <span className="gutter gutter-old">
+                          {line.type === 'removed' ? (
+                            <span className="sign" aria-hidden="true">
+                              -
+                            </span>
+                          ) : (
+                            <span className="sign-spacer" aria-hidden="true" />
+                          )}
+                          <span className="gutter-num">{line.oldLine ?? ''}</span>
+                        </span>
+                        <span className="gutter gutter-new">
+                          {line.type === 'added' ? (
+                            <span className="sign" aria-hidden="true">
+                              +
+                            </span>
+                          ) : (
+                            <span className="sign-spacer" aria-hidden="true" />
+                          )}
+                          <span className="gutter-num">{line.newLine ?? ''}</span>
                         </span>
                         <button
                           type="button"
@@ -438,7 +613,8 @@ export function CommitReview({
                           disabled={!canComment}
                           onClick={() => {
                             if (lineNo === null || line.type === 'meta') return
-                            setDraftMessage(false)
+                            setDraftCommit(false)
+                            setDraftFile(false)
                             setDraftLine({
                               path: activeFile.path,
                               line: lineNo,
@@ -452,17 +628,14 @@ export function CommitReview({
                         </button>
                       </div>
                       {related.map((c) => (
-                        <div key={c.id} className="comment-thread inline">
-                          <p>{c.body}</p>
-                          <button
-                            type="button"
-                            className="btn link"
-                            disabled={busy}
-                            onClick={() => onDelete(c.id)}
-                          >
-                            Delete
-                          </button>
-                        </div>
+                        <EditableComment
+                          key={c.id}
+                          comment={c}
+                          busy={busy}
+                          onSave={onEdit}
+                          onDelete={onDelete}
+                          className="inline"
+                        />
                       ))}
                       {draftLine &&
                       draftLine.path === activeFile.path &&
@@ -481,18 +654,11 @@ export function CommitReview({
                               type="button"
                               className="btn"
                               disabled={busy}
-                              onClick={submitLine}
+                              onClick={() => void submitLine()}
                             >
                               Save comment
                             </button>
-                            <button
-                              type="button"
-                              className="btn ghost"
-                              onClick={() => {
-                                setDraftLine(null)
-                                setBody('')
-                              }}
-                            >
+                            <button type="button" className="btn ghost" onClick={clearDrafts}>
                               Cancel
                             </button>
                           </div>

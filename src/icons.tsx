@@ -157,7 +157,7 @@ export function MoonIcon(props: IconProps) {
   return (
     <Svg {...props}>
       <path
-        d="M12.6 10.2A5.25 5.25 0 0 1 5.8 3.4 5.5 5.5 0 1 0 12.6 10.2Z"
+        d="M11.5 10.1A4.75 4.75 0 0 1 5.9 3.7 5.1 5.1 0 1 0 11.5 10.1Z"
         stroke="currentColor"
         strokeWidth="1.25"
         strokeLinejoin="round"
@@ -165,3 +165,32 @@ export function MoonIcon(props: IconProps) {
     </Svg>
   )
 }
+
+/** GitHub-style commit marker: a bead on a horizontal string. */
+export function CommitIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M1.5 8h4.25M10.25 8H14.5"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+      />
+      <circle cx="8" cy="8" r="2.35" stroke="currentColor" strokeWidth="1.25" />
+    </Svg>
+  )
+}
+
+export function CommentBubbleIcon(props: IconProps) {
+  return (
+    <Svg {...props} className={props.className}>
+      <path
+        d="M2.5 2.75h11a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H7.2L4 14.25v-2.999H2.5a1 1 0 0 1-1-1v-6.5a1 1 0 0 1 1-1Z"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
+}
+
