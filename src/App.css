@@ -1131,23 +1131,17 @@ body.is-file-list-resizing iframe {
 
 .file-list .badge {
   flex: 0 0 auto;
-  background: var(--accent);
-  color: #ffffff;
+  background: var(--comment-bg);
+  color: var(--text);
+  border: 1px solid var(--comment-border);
   border-radius: var(--radius);
   font-size: 0.65rem;
+  font-weight: 600;
   min-width: 1.05rem;
   text-align: center;
   padding: 0 0.25rem;
-}
-
-:root[data-theme='dark'] .file-list .badge {
-  color: #121417;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) .file-list .badge {
-    color: #121417;
-  }
+  line-height: 1.35;
+  box-sizing: border-box;
 }
 
 .status {
@@ -1315,31 +1309,131 @@ body.is-file-list-resizing iframe {
 }
 
 .comment-thread {
+  position: relative;
   background: var(--comment-bg);
   border: 1px solid var(--comment-border);
   border-radius: var(--radius);
-  padding: 0.45rem 0.55rem;
-  margin: 0.4rem 0;
+  padding: 0.6rem 0.7rem;
+  margin: 0.55rem 0;
   font-size: 0.78rem;
 }
 
-.comment-thread.inline,
-.comment-draft.inline {
-  margin: 0 0 0.35rem 5.5rem;
+.comment-thread.is-editing {
+  z-index: 4;
 }
 
-.comment-thread.file-level,
-.comment-draft.file-level {
-  margin: 0.55rem 0.75rem;
+.comment-thread.is-editing .comment-view {
+  visibility: hidden;
+  pointer-events: none;
 }
 
-.comment-thread p {
-  margin: 0 0 0.3rem;
+.comment-thread.inline {
+  margin: 0.5rem 0.75rem 0.55rem 5.5rem;
+}
+
+.comment-thread.file-level {
+  margin: 0.65rem 0.85rem;
+}
+
+.comment-edit-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+}
+
+.comment-compose {
+  position: relative;
+  z-index: 3;
+  height: 0;
+  margin: 0;
+}
+
+.comment-compose.inline .compose-panel {
+  left: 5.5rem;
+  right: 0.75rem;
+}
+
+.comment-compose.file-level .compose-panel {
+  left: 0.85rem;
+  right: 0.85rem;
+}
+
+.comment-compose .compose-panel {
+  position: absolute;
+  top: 0.35rem;
+  left: 0;
+  right: 0;
+  z-index: 5;
+}
+
+.comment-view {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.comment-body-hit {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   font-size: 0.78rem;
-  line-height: 1.35;
+  line-height: 1.4;
+  text-align: left;
+  white-space: pre-wrap;
+  cursor: pointer;
 }
 
-.comment-thread textarea {
+.comment-body-hit:disabled {
+  cursor: default;
+}
+
+.comment-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: calc(0.78rem * 1.4);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 0;
+  flex: 0 0 auto;
+  align-self: start;
+}
+
+.comment-icon-btn:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.comment-delete-btn:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.comment-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.comment-icon-btn svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.comment-thread textarea,
+.compose-panel textarea {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1351,30 +1445,36 @@ body.is-file-list-resizing iframe {
   font-family: inherit;
 }
 
-.comment-actions {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.comment-draft {
-  margin-top: 0.5rem;
-}
-
-.comment-draft textarea {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.4rem 0.5rem;
-  resize: vertical;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.78rem;
+.comment-thread.inline textarea,
+.comment-compose.inline .compose-panel textarea,
+.comment-thread.file-level textarea,
+.comment-compose.file-level .compose-panel textarea {
+  font-family: var(--mono);
 }
 
 .draft-actions {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.45rem;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.draft-actions .btn {
+  min-width: 4.75rem;
+}
+
+.draft-actions .comment-delete-btn {
+  margin-left: auto;
+  align-self: center;
+  height: 1.6rem;
+}
+
+.commit-edit .draft-actions {
+  margin-top: 0;
+}
+
+.compose-panel .draft-actions {
+  margin-top: 10px;
 }
 
 .theme-toggle {

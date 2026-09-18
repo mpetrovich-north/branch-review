@@ -213,3 +213,17 @@ export function EditIcon(props: IconProps) {
   )
 }
 
+export function TrashIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M3.25 4.5h9.5M6.25 4.5V3.4c0-.5.4-.9.9-.9h1.7c.5 0 .9.4.9.9V4.5M5.1 4.5l.55 8.1c.05.55.5.95 1.05.95h2.6c.55 0 1-.4 1.05-.95l.55-8.1"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
+}
+

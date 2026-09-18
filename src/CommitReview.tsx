@@ -29,7 +29,61 @@ import {
   FileIcon,
   FolderIcon,
   StatusIcon,
+  TrashIcon,
 } from './icons'
+
+function isCommentSaveShortcut(e: { key: string; metaKey: boolean; ctrlKey: boolean }): boolean {
+  return e.key === 'Enter' && (e.metaKey || e.ctrlKey)
+}
+
+function DraftActions({
+  busy = false,
+  saveDisabled = false,
+  onSave,
+  onCancel,
+  onReset,
+  onDelete,
+}: {
+  busy?: boolean
+  saveDisabled?: boolean
+  onSave: () => void
+  onCancel: () => void
+  onReset?: () => void
+  onDelete?: () => void
+}) {
+  return (
+    <div className="draft-actions">
+      <button
+        type="button"
+        className="btn"
+        disabled={busy || saveDisabled}
+        onClick={onSave}
+      >
+        Save
+      </button>
+      <button type="button" className="btn ghost" disabled={busy} onClick={onCancel}>
+        Cancel
+      </button>
+      {onReset ? (
+        <button type="button" className="draft-reset" disabled={busy} onClick={onReset}>
+          Reset
+        </button>
+      ) : null}
+      {onDelete ? (
+        <button
+          type="button"
+          className="comment-icon-btn comment-delete-btn"
+          title="Delete comment"
+          aria-label="Delete comment"
+          disabled={busy}
+          onClick={onDelete}
+        >
+          <TrashIcon />
+        </button>
+      ) : null}
+    </div>
+  )
+}
 
 type Props = {
   commit: CommitSummary
@@ -221,42 +275,25 @@ function beginEdit() {
               aria-label="Commit description"
             />
           )}
-          <div className="draft-actions">
-            <button
-              type="button"
-              className="btn"
-              disabled={busy || (kind === 'subject' && !draft.trim())}
-              onClick={() => void save()}
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              className="btn ghost"
-              disabled={busy}
-              onClick={() => {
-                setEditing(false)
-                setDraft(display)
-              }}
-            >
-              Cancel
-            </button>
-            {isEdited ? (
-              <button
-                type="button"
-                className="commit-edit-reset"
-                disabled={busy}
-                onClick={() => {
-                  void onReset().then(() => {
-                    setEditing(false)
-                    setDraft(original)
-                  })
-                }}
-              >
-                Reset
-              </button>
-            ) : null}
-          </div>
+          <DraftActions
+            busy={busy}
+            saveDisabled={kind === 'subject' && !draft.trim()}
+            onSave={() => void save()}
+            onCancel={() => {
+              setEditing(false)
+              setDraft(display)
+            }}
+            onReset={
+              isEdited
+                ? () => {
+                    void onReset().then(() => {
+                      setEditing(false)
+                      setDraft(original)
+                    })
+                  }
+                : undefined
+            }
+          />
         </div>
       ) : null}
     </div>
@@ -322,56 +359,70 @@ function EditableComment({
     setEditing(false)
   }
 
+  function beginEdit() {
+    if (busy) return
+    setDraft(comment.body)
+    setEditing(true)
+  }
+
   return (
-    <div className={className ? `comment-thread ${className}` : 'comment-thread'}>
+    <div
+      className={`comment-thread${editing ? ' is-editing' : ''}${className ? ` ${className}` : ''}`}
+    >
+      <div className="comment-view" aria-hidden={editing || undefined}>
+        <button
+          type="button"
+          className="comment-icon-btn comment-edit-btn"
+          title="Edit comment"
+          aria-label="Edit comment"
+          disabled={busy || editing}
+          onClick={beginEdit}
+        >
+          <EditIcon />
+        </button>
+        <button
+          type="button"
+          className="comment-body-hit"
+          disabled={busy || editing}
+          onClick={beginEdit}
+        >
+          {comment.body}
+        </button>
+        <button
+          type="button"
+          className="comment-icon-btn comment-delete-btn"
+          title="Delete comment"
+          aria-label="Delete comment"
+          disabled={busy || editing}
+          onClick={() => void onDelete(comment.id)}
+        >
+          <TrashIcon />
+        </button>
+      </div>
       {editing ? (
-        <>
+        <div className="compose-panel comment-edit-overlay">
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={3}
             autoFocus
+            onKeyDown={(e) => {
+              if (!isCommentSaveShortcut(e)) return
+              e.preventDefault()
+              if (!busy) void save()
+            }}
           />
-          <div className="draft-actions">
-            <button type="button" className="btn" disabled={busy} onClick={() => void save()}>
-              Save
-            </button>
-            <button
-              type="button"
-              className="btn ghost"
-              disabled={busy}
-              onClick={() => {
-                setEditing(false)
-                setDraft(comment.body)
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p>{comment.body}</p>
-          <div className="comment-actions">
-            <button
-              type="button"
-              className="btn link"
-              disabled={busy}
-              onClick={() => setEditing(true)}
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              className="btn link"
-              disabled={busy}
-              onClick={() => void onDelete(comment.id)}
-            >
-              Delete
-            </button>
-          </div>
-        </>
-      )}
+          <DraftActions
+            busy={busy}
+            onSave={() => void save()}
+            onCancel={() => {
+              setEditing(false)
+              setDraft(comment.body)
+            }}
+            onDelete={() => void onDelete(comment.id)}
+          />
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -575,21 +626,26 @@ function FileDiffSection({
         />
       ))}
       {draftFilePath === file.path ? (
-        <div className="comment-draft file-level">
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Comment on this file"
-            rows={3}
-            autoFocus
-          />
-          <div className="draft-actions">
-            <button type="button" className="btn" disabled={busy} onClick={onSubmitFile}>
-              Save comment
-            </button>
-            <button type="button" className="btn ghost" onClick={onClearDrafts}>
-              Cancel
-            </button>
+        <div className="comment-compose file-level">
+          <div className="compose-panel">
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Comment on this file"
+              rows={3}
+              autoFocus
+              onKeyDown={(e) => {
+                if (!isCommentSaveShortcut(e)) return
+                e.preventDefault()
+                if (!busy) onSubmitFile()
+              }}
+            />
+            <DraftActions
+              busy={busy}
+              saveDisabled={!body.trim()}
+              onSave={onSubmitFile}
+              onCancel={onClearDrafts}
+            />
           </div>
         </div>
       ) : null}
@@ -646,21 +702,26 @@ function FileDiffSection({
                 draftLine.path === file.path &&
                 draftLine.line === lineNo &&
                 draftLine.lineType === line.type ? (
-                  <div className="comment-draft inline">
-                    <textarea
-                      value={body}
-                      onChange={(e) => setBody(e.target.value)}
-                      placeholder="Leave a comment"
-                      rows={3}
-                      autoFocus
-                    />
-                    <div className="draft-actions">
-                      <button type="button" className="btn" disabled={busy} onClick={onSubmitLine}>
-                        Save comment
-                      </button>
-                      <button type="button" className="btn ghost" onClick={onClearDrafts}>
-                        Cancel
-                      </button>
+                  <div className="comment-compose inline">
+                    <div className="compose-panel">
+                      <textarea
+                        value={body}
+                        onChange={(e) => setBody(e.target.value)}
+                        placeholder="Comment on this line"
+                        rows={3}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (!isCommentSaveShortcut(e)) return
+                          e.preventDefault()
+                          if (!busy) onSubmitLine()
+                        }}
+                      />
+                      <DraftActions
+                        busy={busy}
+                        saveDisabled={!body.trim()}
+                        onSave={onSubmitLine}
+                        onCancel={onClearDrafts}
+                      />
                     </div>
                   </div>
                 ) : null}
@@ -1128,26 +1189,26 @@ export function CommitReview({
             />
           ))}
           {draftCommit ? (
-            <div className="comment-draft">
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder="Comment on this commit"
-                rows={3}
-                autoFocus
-              />
-              <div className="draft-actions">
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={busy}
-                  onClick={() => void submitCommit()}
-                >
-                  Save comment
-                </button>
-                <button type="button" className="btn ghost" onClick={clearDrafts}>
-                  Cancel
-                </button>
+            <div className="comment-compose">
+              <div className="compose-panel">
+                <textarea
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder="Comment on this commit"
+                  rows={3}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (!isCommentSaveShortcut(e)) return
+                    e.preventDefault()
+                    if (!busy) void submitCommit()
+                  }}
+                />
+                <DraftActions
+                  busy={busy}
+                  saveDisabled={!body.trim()}
+                  onSave={() => void submitCommit()}
+                  onCancel={clearDrafts}
+                />
               </div>
             </div>
           ) : null}
