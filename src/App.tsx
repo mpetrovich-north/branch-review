@@ -234,7 +234,9 @@ export default function App() {
         setRepos(listed.repos)
         const initial = pickInitialRepo(listed.repos, listed.preferredRepo)
         if (!initial) {
-          setError('No git repos found under the configured roots')
+          setActiveRepoPath(null)
+          setRepoPath(null)
+          setMeta(null)
           return
         }
         await loadRepo(initial)
@@ -441,6 +443,7 @@ export default function App() {
   async function changeScanDirectory() {
     setLoading(true)
     setError(null)
+    configSaveGen.current += 1
     try {
       const listed = await pickRepoRoot()
       if (listed.cancelled) return
@@ -450,7 +453,14 @@ export default function App() {
         setActiveRepoPath(null)
         setRepoPath(null)
         setMeta(null)
-        setError('No git repos found under the configured roots')
+        setCommits([])
+        setFiles([])
+        setComments([])
+        setMessageEdits({})
+        setSelectedSha(null)
+        setReviewDraft('')
+        setBaseDraft('')
+        hydrated.current = false
         return
       }
       await loadRepo(next)
@@ -461,7 +471,7 @@ export default function App() {
     }
   }
 
-  if (loading && !meta) {
+  if (loading && !meta && repos.length === 0) {
     return (
       <div className="app-shell">
         <p className="muted">Loading…</p>
@@ -469,19 +479,7 @@ export default function App() {
     )
   }
 
-  if (!repoPath || (!meta && error)) {
-    return (
-      <div className="app-shell">
-        <p className="error">{error ?? 'No repository selected.'}</p>
-        <p>
-          <button type="button" className="btn ghost" onClick={() => void changeScanDirectory()}>
-            Change directory…
-          </button>
-        </p>
-      </div>
-    )
-  }
-
+  const noRepos = repos.length === 0
   const ready = configIsReady(meta?.config ?? null)
   const selected = commits.find((c) => c.sha === selectedSha) ?? null
   const selectedIndex = selected ? commits.findIndex((c) => c.sha === selected.sha) : -1
@@ -497,6 +495,11 @@ export default function App() {
             void onRepoChange(e.target.value)
           }}
         >
+          {noRepos ? (
+            <option value="" disabled>
+              No repos
+            </option>
+          ) : null}
           <option value={CHANGE_DIRECTORY_VALUE}>Change directory…</option>
           {repos.map((r) => (
             <option key={r.path} value={r.path} title={r.path}>
@@ -635,7 +638,7 @@ export default function App() {
           {!commitsCollapsed ? branchControls : null}
 
           <div id="commit-list-body" className="commit-list-body" hidden={commitsCollapsed}>
-            {!meta ? (
+            {noRepos ? null : !meta ? (
               <p className="empty">Loading repository…</p>
             ) : !ready ? null : commits.length === 0 ? (
               <p className="empty">No commits ahead of the base branch.</p>
@@ -675,7 +678,9 @@ export default function App() {
         </aside>
 
         <main className="main-pane">
-          {showSetupHint ? (
+          {noRepos ? (
+            <p className="empty">No repos found in that directory.</p>
+          ) : showSetupHint ? (
             <div className="setup-hint">
               <svg
                 className="setup-hint-arrow"
