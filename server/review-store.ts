@@ -17,7 +17,7 @@ export type StoredConfig = {
   reviewBranch?: string
 }
 
-const REVIEW_DIR = '.review'
+const REVIEW_DIR = '.branch-review'
 const GITIGNORE_CONTENTS = `*
 `
 

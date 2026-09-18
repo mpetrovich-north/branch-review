@@ -1,4 +1,4 @@
-# `.review/` schema (v1)
+# `.branch-review/` schema (v1)
 
 ## `config.json`
 
