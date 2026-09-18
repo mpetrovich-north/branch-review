@@ -3,6 +3,7 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [react()],
+  appType: 'spa',
   server: {
     port: 5173,
     proxy: {
