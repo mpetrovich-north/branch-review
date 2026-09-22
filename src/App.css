@@ -465,7 +465,6 @@ pre,
 .commit-list.is-collapsed .commit-list-header {
   justify-content: center;
   padding: 0.85rem 0.25rem 0.55rem;
-  border-bottom: 1px solid var(--border);
 }
 
 .commit-list-count {
@@ -1069,7 +1068,14 @@ body.is-file-list-resizing iframe {
   position: relative;
   width: 100%;
   border: 0;
-  background: transparent;
+  /* Opaque fill from the tree line keeps glyph rasterization stable on hover
+     (transparent → muted backgrounds shift text ~1px under subpixel AA). */
+  background-color: transparent;
+  background-image: linear-gradient(
+    to right,
+    transparent var(--tree-hover-inset, 0px),
+    var(--surface) var(--tree-hover-inset, 0px)
+  );
   display: flex;
   gap: 0.3rem;
   align-items: center;
@@ -1081,6 +1087,7 @@ body.is-file-list-resizing iframe {
   color: var(--text);
   font: inherit;
   font-size: 0.75rem;
+  line-height: 1.2;
   min-height: 1.5rem;
   border-radius: var(--radius);
   z-index: 0;
@@ -1092,13 +1099,14 @@ body.is-file-list-resizing iframe {
 }
 
 .file-tree-dir:hover,
-.file-tree-file:hover {
-  background: var(--surface-muted);
-}
-
+.file-tree-file:hover,
 .file-tree-file.active,
 .file-tree-file.active:hover {
-  background: var(--surface-muted);
+  background-image: linear-gradient(
+    to right,
+    transparent var(--tree-hover-inset, 0px),
+    var(--surface-muted) var(--tree-hover-inset, 0px)
+  );
   box-shadow: none;
 }
 
@@ -1168,8 +1176,6 @@ body.is-file-list-resizing iframe {
 
 .file-tree-name-float-label {
   position: absolute;
-  top: 0;
-  bottom: 0;
   z-index: 2;
   display: flex;
   align-items: center;
@@ -1179,7 +1185,7 @@ body.is-file-list-resizing iframe {
   white-space: nowrap;
   font-family: var(--mono);
   font-size: 0.75rem;
-  line-height: 1;
+  line-height: 1.2;
   color: var(--text);
 }
 

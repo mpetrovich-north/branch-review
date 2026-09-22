@@ -472,6 +472,8 @@ type NameHover = {
   rowHeight: number
   rowWidth: number
   textLeft: number
+  textTop: number
+  textHeight: number
   rails: { left: number }[]
 }
 
@@ -506,6 +508,14 @@ function FileTree({
   return (
     <ul className={depth === 0 ? 'file-tree' : 'file-tree-nested'} role={depth === 0 ? 'tree' : 'group'}>
       {nodes.map((node) => {
+        // Indent content; hover fill insets to the parent rail / file branch start.
+        const padLeft = `${0.45 + depth * 0.7}rem`
+        const hoverInset = depth > 0 ? `${0.45 + (depth - 1) * 0.7 + 0.28}rem` : '0'
+        const rowStyle = {
+          paddingLeft: padLeft,
+          ['--tree-hover-inset' as string]: hoverInset,
+        }
+
         if (node.kind === 'dir') {
           const isOpen = expanded.has(node.path)
           const railLeft = `${0.45 + depth * 0.7 + 0.28}rem`
@@ -516,7 +526,7 @@ function FileTree({
               <button
                 type="button"
                 className={`file-tree-dir${isOverflowHover ? ' is-overflow-hover' : ''}`}
-                style={{ paddingLeft: `${0.45 + depth * 0.7}rem` }}
+                style={rowStyle}
                 aria-expanded={isOpen}
                 onClick={() => onToggleDir(node.path)}
                 onMouseEnter={(e) => onNameHover(e, node.path, label, 'dir')}
@@ -559,7 +569,7 @@ function FileTree({
             <button
               type="button"
               className={`file-tree-file${isActive ? ' active' : ''}${isOverflowHover ? ' is-overflow-hover' : ''}`}
-              style={{ paddingLeft: `${0.45 + depth * 0.7}rem` }}
+              style={rowStyle}
               onClick={() => onSelectFile(node.path)}
               onMouseEnter={(e) => onNameHover(e, node.path, node.name, 'file')}
               onMouseLeave={onNameLeave}
@@ -926,6 +936,8 @@ export function CommitReview({
       rowHeight: rowRect.height,
       rowWidth: nameRect.left - rowRect.left + nameEl.scrollWidth + rightPad,
       textLeft: nameRect.left - rowRect.left,
+      textTop: nameRect.top - rowRect.top,
+      textHeight: nameRect.height,
       rails,
     })
   }
@@ -1393,7 +1405,11 @@ export function CommitReview({
           ))}
           <span
             className="file-tree-name-float-label"
-            style={{ left: nameHover.textLeft }}
+            style={{
+              left: nameHover.textLeft,
+              top: nameHover.textTop,
+              height: nameHover.textHeight,
+            }}
           >
             {nameHover.text}
           </span>
