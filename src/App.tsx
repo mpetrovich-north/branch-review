@@ -510,7 +510,21 @@ export default function App() {
   if (loading && !meta && repos.length === 0) {
     return (
       <div className="app-shell">
-        <p className="muted">Loading…</p>
+        <div className="main-layout">
+          <aside className="commit-list">
+            <div className="commit-list-header">
+              <div className="commit-list-heading">
+                <h1 className="commit-list-title">Branch Review</h1>
+              </div>
+            </div>
+          </aside>
+          <main className="main-pane">
+            <div className="page-loading" role="status" aria-live="polite">
+              <span className="page-loading-spinner" aria-hidden="true" />
+              <p className="page-loading-text">Loading repositories…</p>
+            </div>
+          </main>
+        </div>
       </div>
     )
   }
@@ -803,12 +817,20 @@ export default function App() {
               <p className="setup-hint-text">Select a review branch to begin</p>
             </div>
           ) : !meta || !ready ? (
-            <p className="muted setup-wait">
-              {meta ? 'Select a review branch to begin' : 'Loading repository…'}
-            </p>
+            meta ? (
+              <p className="muted setup-wait">Select a review branch to begin</p>
+            ) : (
+              <div className="page-loading" role="status" aria-live="polite">
+                <span className="page-loading-spinner" aria-hidden="true" />
+                <p className="page-loading-text">Loading repository…</p>
+              </div>
+            )
           ) : selected ? (
             diffLoading ? (
-              <p className="muted">Loading diff…</p>
+              <div className="page-loading" role="status" aria-live="polite">
+                <span className="page-loading-spinner" aria-hidden="true" />
+                <p className="page-loading-text">Loading diff…</p>
+              </div>
             ) : (
               <CommitReview
                 commit={selected}
