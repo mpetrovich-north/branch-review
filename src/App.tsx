@@ -557,7 +557,6 @@ export default function App() {
                 type="button"
                 className="commit-list-toggle"
                 aria-expanded={false}
-                aria-controls="commit-list-body"
                 title="Show commits"
                 onClick={() => setCommitsCollapsed(false)}
               >
@@ -643,57 +642,59 @@ export default function App() {
 
           {!commitsCollapsed ? branchControls : null}
 
-          <div id="commit-list-body" className="commit-list-body" hidden={commitsCollapsed}>
-            {noRepos ? null : !meta ? (
-              <p className="empty">Loading repository…</p>
-            ) : !ready ? null : commits.length === 0 ? (
-              <p className="empty">No commits ahead of the base branch.</p>
-            ) : (
-              <>
-                <div
-                  className={`commit-list-count${commitsScrolled ? ' is-scrolled' : ''}`}
-                >
-                  {commits.length} {commits.length === 1 ? 'commit' : 'commits'}
-                </div>
-                <div
-                  className="commit-list-scroll"
-                  onScroll={(e) => {
-                    setCommitsScrolled(e.currentTarget.scrollTop > 0)
-                  }}
-                >
-                  <ol>
-                    {commits.map((c, i) => (
-                      <li key={c.sha}>
-                        <button
-                          type="button"
-                          className={c.sha === selectedSha ? 'active' : ''}
-                          onClick={() => {
-                            setSeedFilePath(null)
-                            setSelectedSha(c.sha)
-                          }}
-                        >
-                          <span className={`idx${reviewedSet.has(c.sha) ? ' is-reviewed' : ''}`}>
-                            {reviewedSet.has(c.sha) ? (
-                              <CheckIcon className="commit-reviewed-icon" title="Reviewed" />
-                            ) : (
-                              i + 1
-                            )}
-                          </span>
-                          <span className="subject">
-                            {messageEdits[c.sha]?.subject ?? c.subject}
-                          </span>
-                          <span className="sha-with-icon">
-                            <CommitIcon className="commit-hash-icon" />
-                            <code className="sha">{c.shortSha}</code>
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              </>
-            )}
-          </div>
+          {!commitsCollapsed ? (
+            <div id="commit-list-body" className="commit-list-body">
+              {noRepos ? null : !meta ? (
+                <p className="empty">Loading repository…</p>
+              ) : !ready ? null : commits.length === 0 ? (
+                <p className="empty">No commits ahead of the base branch.</p>
+              ) : (
+                <>
+                  <div
+                    className={`commit-list-count${commitsScrolled ? ' is-scrolled' : ''}`}
+                  >
+                    {commits.length} {commits.length === 1 ? 'commit' : 'commits'}
+                  </div>
+                  <div
+                    className="commit-list-scroll"
+                    onScroll={(e) => {
+                      setCommitsScrolled(e.currentTarget.scrollTop > 0)
+                    }}
+                  >
+                    <ol>
+                      {commits.map((c, i) => (
+                        <li key={c.sha}>
+                          <button
+                            type="button"
+                            className={c.sha === selectedSha ? 'active' : ''}
+                            onClick={() => {
+                              setSeedFilePath(null)
+                              setSelectedSha(c.sha)
+                            }}
+                          >
+                            <span className={`idx${reviewedSet.has(c.sha) ? ' is-reviewed' : ''}`}>
+                              {reviewedSet.has(c.sha) ? (
+                                <CheckIcon className="commit-reviewed-icon" title="Reviewed" />
+                              ) : (
+                                i + 1
+                              )}
+                            </span>
+                            <span className="subject">
+                              {messageEdits[c.sha]?.subject ?? c.subject}
+                            </span>
+                            <span className="sha-with-icon">
+                              <CommitIcon className="commit-hash-icon" />
+                              <code className="sha">{c.shortSha}</code>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : null}
         </aside>
 
         <main className="main-pane">

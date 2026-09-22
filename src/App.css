@@ -16,6 +16,9 @@
   --meta-bg: #ddf4ff;
   --comment-bg: #fff8c5;
   --comment-border: #d4a72c66;
+  --edit-hover-bg: #fff8c5;
+  --edit-mark-bg: #f5e08a;
+  --edit-mark: #9a6700;
   --danger: #cf222e;
   --status-added: #1a7f37;
   --status-modified: #9a6700;
@@ -51,6 +54,9 @@
     --meta-bg: #1c2430;
     --comment-bg: #3a3420;
     --comment-border: #8b734066;
+    --edit-hover-bg: #3a3420;
+    --edit-mark-bg: #5c4d24;
+    --edit-mark: #e3b341;
     --danger: #f85149;
     --status-added: #3fb950;
     --status-modified: #d4a72c;
@@ -78,6 +84,9 @@
   --meta-bg: #ddf4ff;
   --comment-bg: #fff8c5;
   --comment-border: #d4a72c66;
+  --edit-hover-bg: #fff8c5;
+  --edit-mark-bg: #f5e08a;
+  --edit-mark: #9a6700;
   --danger: #cf222e;
   --status-added: #1a7f37;
   --status-modified: #9a6700;
@@ -104,6 +113,9 @@
   --meta-bg: #1c2430;
   --comment-bg: #3a3420;
   --comment-border: #8b734066;
+  --edit-hover-bg: #3a3420;
+  --edit-mark-bg: #5c4d24;
+  --edit-mark: #e3b341;
   --danger: #f85149;
   --status-added: #3fb950;
   --status-modified: #d4a72c;
@@ -465,6 +477,13 @@ pre,
 .commit-list.is-collapsed .commit-list-header {
   justify-content: center;
   padding: 0.85rem 0.25rem 0.55rem;
+  border: none;
+  box-shadow: none;
+}
+
+.commit-list.is-collapsed {
+  border: none;
+  box-shadow: none;
 }
 
 .commit-list-count {
@@ -675,7 +694,7 @@ pre,
   min-width: 0;
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 0.35rem 0.55rem;
   cursor: pointer;
 }
@@ -688,6 +707,20 @@ pre,
 
 .commit-display-subject .commit-display-main {
   align-items: center;
+}
+
+.commit-display-content {
+  box-sizing: border-box;
+  flex: 1 1 80ch;
+  min-width: min(100%, 80ch);
+  max-width: 100%;
+  padding: 0.35rem;
+  border-radius: var(--radius);
+}
+
+.commit-display-body .commit-display-content {
+  font-family: var(--mono);
+  font-size: 0.8rem;
 }
 
 .commit-display h2 {
@@ -723,21 +756,32 @@ pre,
   pointer-events: auto;
 }
 
-.commit-display:hover:not(:has(.commit-body-toggle:hover)) h2,
-.commit-display:hover:not(:has(.commit-body-toggle:hover)) .commit-body,
-.commit-display:hover:not(:has(.commit-body-toggle:hover)) .commit-body-empty {
-  color: var(--muted);
+.commit-display:hover:not(:has(.commit-body-toggle:hover)) .commit-display-content:not(.is-edited) {
+  background: var(--edit-hover-bg);
+}
+
+.commit-display-content.is-edited {
+  background: var(--edit-mark-bg);
+  color: var(--edit-mark);
+}
+
+.commit-display-content.is-edited h2,
+.commit-display-content.is-edited .commit-body,
+.commit-display-content.is-edited .commit-body-empty {
+  color: var(--edit-mark);
 }
 
 .commit-edited-label {
   flex: 0 0 auto;
+  align-self: center;
   font-family: var(--mono);
   font-size: 0.65rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--muted);
-  border: 1px solid var(--border);
+  color: var(--edit-mark);
+  background: var(--edit-mark-bg);
+  border: 1px solid var(--comment-border);
   border-radius: var(--radius);
   padding: 0.05rem 0.35rem;
   line-height: 1.3;
@@ -1647,5 +1691,6 @@ body.is-file-list-resizing iframe {
   .commit-list.is-collapsed {
     max-height: none;
     height: auto;
+    border-bottom: 0;
   }
 }
