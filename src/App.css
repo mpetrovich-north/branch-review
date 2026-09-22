@@ -942,7 +942,7 @@ pre,
 
 .diff-layout {
   display: grid;
-  grid-template-columns: var(--file-list-width, 260px) 0.6rem minmax(0, 1fr);
+  grid-template-columns: var(--file-list-width, 260px) 1rem minmax(0, 1fr);
   gap: 0;
   align-items: start;
 }
@@ -952,7 +952,7 @@ pre,
   flex-direction: column;
   gap: 1rem;
   min-width: 0;
-  padding-left: 0.4rem;
+  padding-left: 0;
 }
 
 .diff-file {
