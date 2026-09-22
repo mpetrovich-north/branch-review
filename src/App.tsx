@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   fetchComments,
   fetchCommits,
@@ -13,7 +13,14 @@ import {
   setActiveRepoPath,
 } from './api'
 import { CommitReview } from './CommitReview'
-import { CommitIcon, CheckIcon, MoonIcon, SunIcon } from './icons'
+import {
+  CheckboxIcon,
+  CommitIcon,
+  CheckIcon,
+  MergeIcon,
+  MoonIcon,
+  SunIcon,
+} from './icons'
 import { effectiveTheme, toggleStoredTheme, type ThemePreference } from './theme'
 import type {
   Comment,
@@ -159,6 +166,8 @@ export default function App() {
     () => parseViewUrl().filePath,
   )
   const [commitsScrolled, setCommitsScrolled] = useState(false)
+  const [showReviewed, setShowReviewed] = useState(true)
+  const [showMerges, setShowMerges] = useState(true)
   const hydrated = useRef(false)
   const configSaveGen = useRef(0)
   const preferShaRef = useRef<string | null>(parseViewUrl().commitSha)
@@ -431,6 +440,27 @@ export default function App() {
 
   const reviewedSet = useMemo(() => new Set(reviewedShas), [reviewedShas])
 
+  const visibleCommits = useMemo(
+    () =>
+      commits.filter((c) => {
+        if (!showReviewed && reviewedSet.has(c.sha)) return false
+        if (!showMerges && c.isMerge) return false
+        return true
+      }),
+    [commits, reviewedSet, showMerges, showReviewed],
+  )
+
+  useLayoutEffect(() => {
+    if (!selectedSha) return
+    if (visibleCommits.some((c) => c.sha === selectedSha)) return
+    const oldIndex = commits.findIndex((c) => c.sha === selectedSha)
+    const next =
+      visibleCommits.find((c) => commits.findIndex((x) => x.sha === c.sha) >= oldIndex) ??
+      visibleCommits[visibleCommits.length - 1] ??
+      null
+    setSelectedSha(next?.sha ?? null)
+  }, [visibleCommits, selectedSha, commits])
+
   async function onRepoChange(next: string) {
     if (next === CHANGE_DIRECTORY_VALUE) {
       await changeScanDirectory()
@@ -487,8 +517,17 @@ export default function App() {
 
   const noRepos = repos.length === 0
   const ready = configIsReady(meta?.config ?? null)
-  const selected = commits.find((c) => c.sha === selectedSha) ?? null
+  const selected = visibleCommits.find((c) => c.sha === selectedSha) ?? null
   const selectedIndex = selected ? commits.findIndex((c) => c.sha === selected.sha) : -1
+  const visibleIndex = selected
+    ? visibleCommits.findIndex((c) => c.sha === selected.sha)
+    : -1
+  const prevVisible =
+    visibleIndex > 0 ? visibleCommits[visibleIndex - 1] : undefined
+  const nextVisible =
+    visibleIndex >= 0 && visibleIndex < visibleCommits.length - 1
+      ? visibleCommits[visibleIndex + 1]
+      : undefined
 
   const branchControls = (
     <div className="branch-controls">
@@ -653,44 +692,86 @@ export default function App() {
                   <div
                     className={`commit-list-count${commitsScrolled ? ' is-scrolled' : ''}`}
                   >
-                    {commits.length} {commits.length === 1 ? 'commit' : 'commits'}
+                    <span>
+                      {commits.length} {commits.length === 1 ? 'commit' : 'commits'}
+                    </span>
+                    <span className="commit-list-filters">
+                      <label className="commit-filter-toggle" title="Show reviewed commits">
+                        <input
+                          type="checkbox"
+                          className="visually-hidden"
+                          checked={showReviewed}
+                          onChange={(e) => setShowReviewed(e.target.checked)}
+                        />
+                        <CheckboxIcon checked={showReviewed} />
+                        Reviewed
+                      </label>
+                      <label className="commit-filter-toggle" title="Show merge commits">
+                        <input
+                          type="checkbox"
+                          className="visually-hidden"
+                          checked={showMerges}
+                          onChange={(e) => setShowMerges(e.target.checked)}
+                        />
+                        <CheckboxIcon checked={showMerges} />
+                        Merges
+                      </label>
+                    </span>
                   </div>
-                  <div
-                    className="commit-list-scroll"
-                    onScroll={(e) => {
-                      setCommitsScrolled(e.currentTarget.scrollTop > 0)
-                    }}
-                  >
-                    <ol>
-                      {commits.map((c, i) => (
-                        <li key={c.sha}>
-                          <button
-                            type="button"
-                            className={c.sha === selectedSha ? 'active' : ''}
-                            onClick={() => {
-                              setSeedFilePath(null)
-                              setSelectedSha(c.sha)
-                            }}
-                          >
-                            <span className={`idx${reviewedSet.has(c.sha) ? ' is-reviewed' : ''}`}>
-                              {reviewedSet.has(c.sha) ? (
-                                <CheckIcon className="commit-reviewed-icon" title="Reviewed" />
-                              ) : (
-                                i + 1
-                              )}
-                            </span>
-                            <span className="subject">
-                              {messageEdits[c.sha]?.subject ?? c.subject}
-                            </span>
-                            <span className="sha-with-icon">
-                              <CommitIcon className="commit-hash-icon" />
-                              <code className="sha">{c.shortSha}</code>
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
+                  {visibleCommits.length === 0 ? (
+                    <p className="empty">No commits to show.</p>
+                  ) : (
+                    <div
+                      className="commit-list-scroll"
+                      onScroll={(e) => {
+                        setCommitsScrolled(e.currentTarget.scrollTop > 0)
+                      }}
+                    >
+                      <ol>
+                        {commits.map((c) => {
+                          if (!showReviewed && reviewedSet.has(c.sha)) return null
+                          if (!showMerges && c.isMerge) return null
+                          return (
+                            <li key={c.sha}>
+                              <button
+                                type="button"
+                                className={c.sha === selectedSha ? 'active' : ''}
+                                onClick={() => {
+                                  setSeedFilePath(null)
+                                  setSelectedSha(c.sha)
+                                }}
+                              >
+                                <span
+                                  className={`idx${reviewedSet.has(c.sha) ? ' is-reviewed' : ''}`}
+                                >
+                                  {reviewedSet.has(c.sha) ? (
+                                    <CheckIcon
+                                      className="commit-list-type-icon"
+                                      title="Reviewed"
+                                    />
+                                  ) : c.isMerge ? (
+                                    <MergeIcon
+                                      className="commit-list-type-icon"
+                                      title="Merge commit"
+                                    />
+                                  ) : (
+                                    <CommitIcon
+                                      className="commit-list-type-icon"
+                                      title="Commit"
+                                    />
+                                  )}
+                                </span>
+                                <span className="subject">
+                                  {messageEdits[c.sha]?.subject ?? c.subject}
+                                </span>
+                                <code className="sha">{c.shortSha}</code>
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ol>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -745,13 +826,17 @@ export default function App() {
                 nav={{
                   index: selectedIndex,
                   total: commits.length,
+                  canPrev: Boolean(prevVisible),
+                  canNext: Boolean(nextVisible),
                   onPrev: () => {
+                    if (!prevVisible) return
                     setSeedFilePath(null)
-                    setSelectedSha(commits[selectedIndex - 1]!.sha)
+                    setSelectedSha(prevVisible.sha)
                   },
                   onNext: () => {
+                    if (!nextVisible) return
                     setSeedFilePath(null)
-                    setSelectedSha(commits[selectedIndex + 1]!.sha)
+                    setSelectedSha(nextVisible.sha)
                   },
                 }}
               />

@@ -102,6 +102,8 @@ type Props = {
     total: number
     onPrev: () => void
     onNext: () => void
+    canPrev?: boolean
+    canNext?: boolean
   }
 }
 
@@ -1226,7 +1228,7 @@ export function CommitReview({
               <button
                 type="button"
                 className="btn ghost"
-                disabled={nav.index <= 0}
+                disabled={!(nav.canPrev ?? nav.index > 0)}
                 onClick={nav.onPrev}
               >
                 Previous
@@ -1237,7 +1239,7 @@ export function CommitReview({
               <button
                 type="button"
                 className="btn ghost"
-                disabled={nav.index < 0 || nav.index >= nav.total - 1}
+                disabled={!(nav.canNext ?? (nav.index >= 0 && nav.index < nav.total - 1))}
                 onClick={nav.onNext}
               >
                 Next

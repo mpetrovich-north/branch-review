@@ -181,6 +181,21 @@ export function CommitIcon(props: IconProps) {
   )
 }
 
+/** Two arrows from below that join into one shared head. */
+export function MergeIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M4.25 13.25 8 6.5 11.75 13.25M8 6.5V2.75M5.75 4.75 8 2.75l2.25 2"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
+}
+
 export function CommentBubbleIcon(props: IconProps) {
   return (
     <Svg {...props} className={props.className}>

@@ -64,6 +64,7 @@ export type CommitSummary = {
   authorName: string
   authorEmail: string
   authoredAt: string
+  isMerge: boolean
 }
 
 export type DiffLine = {

@@ -10,6 +10,8 @@
   --muted: #656d76;
   --accent: #0969da;
   --accent-hover: #0550ae;
+  --control: #0969da;
+  --control-hover: #0550ae;
   --select-bg: #f0f7ff;
   --added-bg: #dafbe1;
   --removed-bg: #ffebe9;
@@ -48,6 +50,8 @@
     --muted: #9aa0a6;
     --accent: #e3b341;
     --accent-hover: #f0c14d;
+    --control: #4493f8;
+    --control-hover: #79b8ff;
     --select-bg: #242830;
     --added-bg: #163227;
     --removed-bg: #3a1d1f;
@@ -78,6 +82,8 @@
   --muted: #656d76;
   --accent: #0969da;
   --accent-hover: #0550ae;
+  --control: #0969da;
+  --control-hover: #0550ae;
   --select-bg: #f0f7ff;
   --added-bg: #dafbe1;
   --removed-bg: #ffebe9;
@@ -107,6 +113,8 @@
   --muted: #9aa0a6;
   --accent: #e3b341;
   --accent-hover: #f0c14d;
+  --control: #4493f8;
+  --control-hover: #79b8ff;
   --select-bg: #242830;
   --added-bg: #163227;
   --removed-bg: #3a1d1f;
@@ -179,8 +187,7 @@ pre,
   flex-direction: column;
   gap: 0.45rem;
   padding: 0.55rem 0.85rem 0.85rem;
-  /* Same header → body divider as .commit-message-panel. */
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0;
 }
 
 .branch-controls .field {
@@ -490,7 +497,11 @@ pre,
   flex: 0 0 auto;
   position: relative;
   z-index: 2;
-  padding: 0.45rem 0.85rem 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.85rem 0.4rem;
   font-family: var(--mono);
   font-size: 0.68rem;
   font-weight: 600;
@@ -498,14 +509,76 @@ pre,
   text-transform: uppercase;
   color: var(--muted);
   background: var(--sidebar);
-  border-bottom: 0;
-  border-right: 0;
+  border: 0;
   box-shadow: none;
   transition: box-shadow 0.15s ease;
 }
 
+.commit-list-count::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+
 .commit-list-count.is-scrolled {
-  box-shadow: 0 6px 10px -6px color-mix(in srgb, var(--text) 32%, transparent);
+  box-shadow: 0 6px 10px -6px color-mix(in srgb, #000 28%, transparent);
+}
+
+:root[data-theme='dark'] .commit-list-count.is-scrolled {
+  box-shadow: 0 6px 10px -6px color-mix(in srgb, #000 55%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .commit-list-count.is-scrolled {
+    box-shadow: 0 6px 10px -6px color-mix(in srgb, #000 55%, transparent);
+  }
+}
+
+.commit-list-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+
+.commit-filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+}
+
+.commit-filter-toggle svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: var(--muted);
+  translate: 0 -1px;
+}
+
+.commit-filter-toggle:hover svg,
+.commit-filter-toggle:has(input:focus-visible) svg {
+  color: var(--text);
+}
+
+.commit-filter-toggle:has(input:checked) svg {
+  color: var(--control);
+}
+
+.commit-filter-toggle:has(input:checked):hover svg,
+.commit-filter-toggle:has(input:checked):has(input:focus-visible) svg {
+  color: var(--control-hover);
 }
 
 .commit-list-body {
@@ -599,9 +672,6 @@ pre,
   width: 100%;
   box-sizing: border-box;
   color: inherit;
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
   line-height: 1.15;
   padding-top: 0.15rem;
   opacity: 0.85;
@@ -612,7 +682,7 @@ pre,
   opacity: 1;
 }
 
-.commit-list .idx .commit-reviewed-icon {
+.commit-list .idx .commit-list-type-icon {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
@@ -623,11 +693,8 @@ pre,
   color: inherit;
 }
 
-.commit-list .sha-with-icon {
-  grid-column: 2;
-}
-
 .commit-list .sha {
+  grid-column: 2;
   color: var(--muted);
   font-size: 0.7rem;
 }

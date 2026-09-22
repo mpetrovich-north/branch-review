@@ -70,6 +70,7 @@ export type CommitSummary = {
   authorName: string
   authorEmail: string
   authoredAt: string
+  isMerge: boolean
 }
 
 export async function listCommitsNotInBase(
@@ -79,7 +80,7 @@ export async function listCommitsNotInBase(
 ): Promise<CommitSummary[]> {
   const baseSha = await resolveCommitish(repoPath, baseBranch)
   const reviewSha = await resolveCommitish(repoPath, reviewBranch)
-  const format = ['%H', '%h', '%s', '%b', '%an', '%ae', '%aI'].join('%x1f') + '%x1e'
+  const format = ['%H', '%h', '%s', '%b', '%an', '%ae', '%aI', '%P'].join('%x1f') + '%x1e'
   const stdout = await git(repoPath, [
     'log',
     '--reverse',
@@ -89,8 +90,9 @@ export async function listCommitsNotInBase(
 
   const records = stdout.split('\x1e').map((r) => r.trim()).filter(Boolean)
   return records.map((record) => {
-    const [sha, shortSha, subject, body, authorName, authorEmail, authoredAt] =
+    const [sha, shortSha, subject, body, authorName, authorEmail, authoredAt, parents] =
       record.split('\x1f')
+    const parentCount = (parents ?? '').trim().split(/\s+/).filter(Boolean).length
     return {
       sha,
       shortSha,
@@ -99,6 +101,7 @@ export async function listCommitsNotInBase(
       authorName,
       authorEmail,
       authoredAt,
+      isMerge: parentCount > 1,
     }
   })
 }
