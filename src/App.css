@@ -526,9 +526,16 @@ pre,
 
 .commit-list.is-collapsed .commit-list-header {
   justify-content: center;
-  padding: 1rem 0.25rem 0.55rem;
+  align-items: stretch;
+  padding: 0;
   border: none;
   box-shadow: none;
+  min-height: 2.75rem;
+}
+
+.commit-list.is-collapsed .commit-list-toggle {
+  width: 100%;
+  min-height: 2.75rem;
 }
 
 .commit-list.is-collapsed {
