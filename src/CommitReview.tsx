@@ -649,6 +649,7 @@ function FileDiffSection({
           onClick={() => onStartFileComment(file.path)}
         >
           <CommentBubbleIcon />
+          Comment
         </button>
       </div>
       {fileComments.map((c) => (
@@ -1181,6 +1182,7 @@ export function CommitReview({
               }}
             >
               <CommentBubbleIcon />
+              Comment
             </button>
             <div className="commit-nav">
               <button
