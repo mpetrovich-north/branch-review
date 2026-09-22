@@ -710,11 +710,12 @@ pre,
 }
 
 .commit-display-content {
+  position: relative;
   box-sizing: border-box;
   flex: 1 1 80ch;
   min-width: min(100%, 80ch);
   max-width: 100%;
-  padding: 0.35rem;
+  padding: 0.35rem 6.5rem 0.35rem 0.35rem;
   border-radius: var(--radius);
 }
 
@@ -731,27 +732,44 @@ pre,
 
 .commit-edit-trigger {
   position: absolute;
-  top: 0.05rem;
-  left: 0;
+  top: 0.35rem;
+  right: 0.35rem;
   z-index: 2;
-  width: 1.15rem;
-  height: 1.15rem;
-  min-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(1.05rem * 1.4);
+  margin: 0;
+  padding: 0 0.2rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-}
-
-.commit-edit-trigger svg {
-  width: 10px;
-  height: 10px;
+  transition: opacity 0.12s ease, color 0.12s ease;
 }
 
 .commit-display-body .commit-edit-trigger {
-  top: 0.1rem;
+  height: calc(0.8rem * 1.4);
 }
 
-.commit-display:hover:not(:has(.commit-body-toggle:hover)) .commit-edit-trigger {
+.commit-edit-trigger:hover:not(:disabled) {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.commit-edit-trigger:disabled {
+  opacity: 0;
+  cursor: default;
+}
+
+.commit-display:hover:not(:has(.commit-body-toggle:hover)) .commit-edit-trigger:not(:disabled) {
   opacity: 1;
   pointer-events: auto;
 }
@@ -935,19 +953,6 @@ pre,
 .reviewed-toggle svg {
   width: 14px;
   height: 14px;
-}
-
-.comment-bubble.commit-edit-trigger {
-  width: 1.15rem;
-  height: 1.15rem;
-  min-height: 0;
-  padding: 0;
-  gap: 0;
-}
-
-.comment-bubble.commit-edit-trigger svg {
-  width: 10px;
-  height: 10px;
 }
 
 .commit-body-wrap {

@@ -210,18 +210,6 @@ function EditableCommitText({
     <div
       className={`commit-display commit-display-${kind}${editing ? ' is-editing' : ''}`}
     >
-      {!editing ? (
-        <button
-          type="button"
-          className="comment-bubble commit-edit-trigger"
-          title={kind === 'subject' ? 'Edit subject' : 'Edit description'}
-          aria-label={kind === 'subject' ? 'Edit subject' : 'Edit description'}
-          disabled={busy}
-          onClick={beginEdit}
-        >
-          <EditIcon />
-        </button>
-      ) : null}
       <div
         className="commit-display-main"
         role={editing ? undefined : 'button'}
@@ -246,17 +234,27 @@ function EditableCommitText({
               }
         }
       >
-        {kind === 'subject' ? (
-          <h2 className={isEdited ? 'is-edited' : undefined}>{display}</h2>
-        ) : display ? (
-          <div className={isEdited ? 'is-edited' : undefined}>
+        <div className={`commit-display-content${isEdited ? ' is-edited' : ''}`}>
+          {!editing ? (
+            <button
+              type="button"
+              className="commit-edit-trigger"
+              title={kind === 'subject' ? 'Click to edit subject' : 'Click to edit description'}
+              aria-label={kind === 'subject' ? 'Click to edit subject' : 'Click to edit description'}
+              disabled={busy}
+              onClick={beginEdit}
+            >
+              Click to edit
+            </button>
+          ) : null}
+          {kind === 'subject' ? (
+            <h2>{display}</h2>
+          ) : display ? (
             <CommitBodyDisplay body={display} />
-          </div>
-        ) : (
-          <p className={`muted commit-body-empty${isEdited ? ' is-edited' : ''}`}>
-            No message body
-          </p>
-        )}
+          ) : (
+            <p className="muted commit-body-empty">No message body</p>
+          )}
+        </div>
         {isEdited ? (
           <span className="commit-edited-label" title={`Original: ${original || '(empty)'}`}>
             Edited
