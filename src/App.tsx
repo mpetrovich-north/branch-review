@@ -653,17 +653,28 @@ export default function App() {
                         stroke="currentColor"
                         strokeWidth="1.25"
                       />
+                      <circle cx="8" cy="5.35" r="0.7" fill="currentColor" />
                       <path
-                        d="M6.35 6.2c0-.95.7-1.55 1.65-1.55.95 0 1.65.55 1.65 1.4 0 .7-.4 1.1-.95 1.4-.55.3-.85.55-.85 1.15v.25"
+                        d="M8 7.25v4"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="1.25"
                         strokeLinecap="round"
                       />
-                      <circle cx="8" cy="11.35" r="0.7" fill="currentColor" />
                     </svg>
                     <span className="visually-hidden">Project on GitHub</span>
                   </a>
+                  <button
+                    type="button"
+                    className="theme-toggle"
+                    title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                    aria-label={
+                      theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+                    }
+                    onClick={() => setTheme(toggleStoredTheme())}
+                  >
+                    {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+                  </button>
                 </div>
                 <button
                   type="button"
@@ -868,16 +879,6 @@ export default function App() {
           )}
         </main>
       </div>
-
-      <button
-        type="button"
-        className="theme-toggle"
-        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        onClick={() => setTheme(toggleStoredTheme())}
-      >
-        {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-      </button>
     </div>
   )
 }

@@ -1719,23 +1719,20 @@ body.is-file-list-resizing iframe {
 }
 
 .theme-toggle {
-  position: fixed;
-  right: 1rem;
-  bottom: 1rem;
-  z-index: 40;
-  width: 2.25rem;
-  height: 2.25rem;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
+  width: 1.35rem;
+  height: 1.35rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--muted);
   cursor: pointer;
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 12%, transparent);
   line-height: 0;
-  padding: 0;
 }
 
 .theme-toggle svg {
@@ -1744,7 +1741,6 @@ body.is-file-list-resizing iframe {
 
 .theme-toggle:hover {
   color: var(--accent);
-  border-color: var(--accent);
 }
 
 .muted {
