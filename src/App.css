@@ -166,8 +166,9 @@ pre,
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
-  padding: 0.55rem 0.65rem 0.35rem;
-  border-bottom: 0;
+  padding: 0.55rem 0.85rem 0.85rem;
+  /* Same header → body divider as .commit-message-panel. */
+  border-bottom: 1px solid var(--border);
 }
 
 .branch-controls .field {
@@ -391,8 +392,10 @@ pre,
   align-items: center;
   justify-content: space-between;
   gap: 0.35rem;
-  padding: 0.55rem 0.85rem;
-  min-height: 2rem;
+  /* Match main-pane top inset so the title sits with the commit subject. */
+  padding: 0.85rem 0.85rem 0.55rem;
+  min-height: 2.75rem;
+  border-bottom: 0;
 }
 
 .commit-list-heading {
@@ -404,7 +407,7 @@ pre,
 
 .commit-list-title {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text);
@@ -461,14 +464,15 @@ pre,
 
 .commit-list.is-collapsed .commit-list-header {
   justify-content: center;
-  padding: 0.55rem 0.25rem;
+  padding: 0.85rem 0.25rem 0.55rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .commit-list-count {
   flex: 0 0 auto;
   position: relative;
   z-index: 2;
-  padding: 0.45rem 0.85rem;
+  padding: 0.45rem 0.85rem 0.25rem;
   font-family: var(--mono);
   font-size: 0.68rem;
   font-weight: 600;
@@ -476,8 +480,8 @@ pre,
   text-transform: uppercase;
   color: var(--muted);
   background: var(--sidebar);
-  border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--border);
+  border-bottom: 0;
+  border-right: 0;
   box-shadow: none;
   transition: box-shadow 0.15s ease;
 }
@@ -534,7 +538,7 @@ pre,
   background: transparent;
   padding: 0.55rem 0.85rem;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 1.25rem 1fr;
   grid-template-rows: auto auto;
   gap: 0.1rem 0.5rem;
   cursor: pointer;
@@ -571,25 +575,29 @@ pre,
 
 .commit-list .idx {
   grid-row: span 2;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
   color: inherit;
   font-family: var(--mono);
   font-size: 0.75rem;
-  padding-top: 0.1rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  padding-top: 0.15rem;
   opacity: 0.85;
 }
 
 .commit-list .idx.is-reviewed {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   color: var(--status-added);
   opacity: 1;
-  padding-top: 0.15rem;
 }
 
-.commit-list .idx.is-reviewed .commit-reviewed-icon {
+.commit-list .idx .commit-reviewed-icon {
   width: 14px;
   height: 14px;
+  flex-shrink: 0;
 }
 
 .commit-list .subject {
