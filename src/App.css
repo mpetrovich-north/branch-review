@@ -1308,6 +1308,10 @@ body.is-file-list-resizing iframe {
   box-sizing: border-box;
 }
 
+.line-code span {
+  background-color: transparent !important;
+}
+
 .comment-thread {
   position: relative;
   background: var(--comment-bg);

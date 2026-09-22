@@ -31,6 +31,8 @@ import {
   StatusIcon,
   TrashIcon,
 } from './icons'
+import { useHighlightedDiff, type LineTokens } from './highlight'
+import type { ThemedToken } from 'shiki'
 
 function isSaveShortcut(e: { key: string; metaKey: boolean; ctrlKey: boolean }): boolean {
   return e.key === 'Enter' && (e.metaKey || e.ctrlKey)
@@ -312,6 +314,30 @@ function lineNumberFor(line: DiffFile['lines'][number]): number | null {
   if (line.type === 'removed') return line.oldLine
   if (line.type === 'added' || line.type === 'unchanged') return line.newLine
   return null
+}
+
+function LineCode({
+  content,
+  tokens,
+}: {
+  content: string
+  tokens: ThemedToken[] | null | undefined
+}) {
+  if (!tokens) {
+    return <pre className="line-code">{content || ' '}</pre>
+  }
+  if (tokens.length === 0) {
+    return <pre className="line-code">{' '}</pre>
+  }
+  return (
+    <pre className="line-code">
+      {tokens.map((token, i) => (
+        <span key={i} style={token.htmlStyle as CSSProperties | undefined}>
+          {token.content}
+        </span>
+      ))}
+    </pre>
+  )
 }
 
 function matchesLineComment(
@@ -603,6 +629,8 @@ function FileDiffSection({
   onEdit: (id: string, body: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
 }) {
+  const highlighted: LineTokens[] | null = useHighlightedDiff(file)
+
   return (
     <section id={fileAnchorId(file.path)} className="diff-file" data-file-path={file.path}>
       <div className="diff-file-header">
@@ -693,7 +721,7 @@ function FileDiffSection({
                       })
                     }}
                   >
-                    <pre className="line-code">{line.content || ' '}</pre>
+                    <LineCode content={line.content} tokens={highlighted?.[idx]} />
                   </button>
                 </div>
                 {related.map((c) => (
