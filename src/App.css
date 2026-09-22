@@ -27,6 +27,8 @@
   --gutter-bg: #f6f8fa;
   --error-banner-bg: #ffebe9;
   --error-banner-border: #ffcecb;
+  --file-tree-row-hover: color-mix(in srgb, #000 6%, transparent);
+  --file-tree-row-active: color-mix(in srgb, #000 10%, transparent);
   --radius: 4px;
   --mono: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
   --sans: 'IBM Plex Sans', 'Segoe UI', sans-serif;
@@ -67,6 +69,8 @@
     --gutter-bg: #15181c;
     --error-banner-bg: #3a1d1f;
     --error-banner-border: #6e2b2f;
+    --file-tree-row-hover: color-mix(in srgb, #fff 10%, transparent);
+    --file-tree-row-active: color-mix(in srgb, #fff 16%, transparent);
   }
 }
 
@@ -99,6 +103,8 @@
   --gutter-bg: #f6f8fa;
   --error-banner-bg: #ffebe9;
   --error-banner-border: #ffcecb;
+  --file-tree-row-hover: color-mix(in srgb, #000 6%, transparent);
+  --file-tree-row-active: color-mix(in srgb, #000 10%, transparent);
 }
 
 :root[data-theme='dark'] {
@@ -130,6 +136,8 @@
   --gutter-bg: #15181c;
   --error-banner-bg: #3a1d1f;
   --error-banner-border: #6e2b2f;
+  --file-tree-row-hover: color-mix(in srgb, #fff 10%, transparent);
+  --file-tree-row-active: color-mix(in srgb, #fff 16%, transparent);
 }
 
 * {
@@ -774,7 +782,6 @@ pre,
 .commit-message-panel {
   background: transparent;
   border: 0;
-  border-bottom: 1px solid var(--border);
   border-radius: 0;
   padding: 0.15rem 1.1rem 0.85rem 0;
   margin-bottom: 0.85rem;
@@ -1111,76 +1118,217 @@ pre,
 }
 
 .diff-layout {
+  /* Sticky file header height: equal vertical pad + control row + border. */
+  --diff-file-header-pad-y: 0.55rem;
+  --diff-file-header-clearance: calc(
+    (var(--diff-file-header-pad-y) * 2) + 1.6rem + 1px
+  );
+  /* Leave room left of the file-header Comment control for the files chip/pane. */
+  --file-list-comment-slot: 5.75rem;
+  --file-list-comment-gap: 0.5rem;
   display: grid;
-  grid-template-columns: var(--file-list-width, 260px) 1rem minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
   align-items: start;
 }
 
 .diff-files {
+  grid-column: 1;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.75rem;
   min-width: 0;
   padding-left: 0;
 }
 
 .diff-file {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-right: 0;
-  border-radius: var(--radius) 0 0 var(--radius);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   overflow: visible;
   min-width: 0;
   scroll-margin-top: 12px;
 }
 
+.file-list-chip,
 .file-list {
+  --file-list-glass: color-mix(in srgb, var(--surface) 58%, transparent);
+  --file-list-glass-border: color-mix(in srgb, var(--border) 45%, transparent);
+  --file-list-shadow:
+    0 2px 6px color-mix(in srgb, #000 5%, transparent),
+    0 12px 28px color-mix(in srgb, #000 8%, transparent),
+    0 32px 64px color-mix(in srgb, #000 12%, transparent),
+    0 56px 120px color-mix(in srgb, #000 16%, transparent);
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: end;
+  align-self: start;
   position: sticky;
-  top: var(--sticky-top);
-  width: 100%;
-  max-width: 100%;
-  max-height: calc(100vh - var(--sticky-top));
-  padding-top: 10px;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
+  /* Anchor top-right to the slot left of the file Comment control. */
+  top: calc(var(--sticky-top) + var(--diff-file-header-pad-y));
+  box-sizing: border-box;
+  margin-top: var(--diff-file-header-pad-y);
+  margin-right: calc(
+    1.1rem + var(--file-list-comment-slot) + var(--file-list-comment-gap)
+  );
+  background: var(--file-list-glass);
+  border: 1px solid var(--file-list-glass-border);
+  -webkit-backdrop-filter: blur(28px) saturate(1.45);
+  backdrop-filter: blur(28px) saturate(1.45);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-self: start;
   min-width: 0;
+  pointer-events: auto;
+  transform-origin: top right;
 }
 
-.file-list-resize {
-  position: sticky;
-  top: var(--sticky-top);
-  align-self: stretch;
-  height: calc(100vh - var(--sticky-top));
-  max-height: calc(100vh - var(--sticky-top));
-  cursor: col-resize;
-  touch-action: none;
-  user-select: none;
-  z-index: 3;
+/* Always-visible chip under the expanded pane (shows through when the pane fades). */
+.file-list-chip {
+  z-index: 24;
+  width: max-content;
+  min-width: var(--file-list-comment-slot);
+  height: 1.6rem;
+  min-height: 1.6rem;
+  max-height: 1.6rem;
+  padding: 0 0.35rem 0 0.55rem;
+  border-radius: var(--radius);
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: none;
+  opacity: 1;
 }
 
-.file-list-resize:focus-visible {
-  outline: none;
+.file-list-chip .file-list-heading {
+  height: 100%;
+  gap: 0.35rem;
 }
 
-body.is-file-list-resizing {
-  cursor: col-resize;
-  user-select: none;
+.file-list-chip h3 {
+  padding: 0;
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: none;
+  color: var(--muted);
+  white-space: nowrap;
+  margin: 0;
+  font-family: var(--mono);
 }
 
-body.is-file-list-resizing iframe {
+.file-list-chip .file-list-toggle {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.file-list-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.file-list-chip:hover h3,
+.file-list-chip:hover .file-list-toggle {
+  color: var(--accent);
+}
+
+.file-list {
+  z-index: 25;
+  width: var(--file-list-width, max-content);
+  max-width: min(30rem, calc(100% - 2.2rem));
+  max-height: calc(
+    100vh - var(--sticky-top) - var(--diff-file-header-pad-y) - 1.5rem
+  );
+  padding: 0.55rem 0.55rem 0.45rem;
+  border-radius: 6px;
+  box-shadow: var(--file-list-shadow);
+  opacity: 1;
+  transition: opacity 0.35s ease;
+}
+
+.file-list.is-scroll-hidden {
+  opacity: 0;
   pointer-events: none;
 }
 
-.file-list h3 {
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .file-list-chip,
+  :root:not([data-theme]) .file-list {
+    --file-list-glass: color-mix(in srgb, var(--surface) 42%, transparent);
+    --file-list-glass-border: color-mix(in srgb, #fff 14%, transparent);
+    --file-list-shadow:
+      0 2px 8px color-mix(in srgb, #000 30%, transparent),
+      0 16px 36px color-mix(in srgb, #000 38%, transparent),
+      0 40px 80px color-mix(in srgb, #000 48%, transparent),
+      0 72px 140px color-mix(in srgb, #000 40%, transparent);
+  }
+}
+
+:root[data-theme='dark'] .file-list-chip,
+:root[data-theme='dark'] .file-list {
+  --file-list-glass: color-mix(in srgb, var(--surface) 42%, transparent);
+  --file-list-glass-border: color-mix(in srgb, #fff 14%, transparent);
+  --file-list-shadow:
+    0 2px 8px color-mix(in srgb, #000 30%, transparent),
+    0 16px 36px color-mix(in srgb, #000 38%, transparent),
+    0 40px 80px color-mix(in srgb, #000 48%, transparent),
+    0 72px 140px color-mix(in srgb, #000 40%, transparent);
+}
+
+.file-list-resize {
+  display: none;
+}
+
+.file-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
   flex: 0 0 auto;
+  min-width: 0;
+}
+
+.file-list-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
   margin: 0;
-  padding: 0.15rem 0.25rem 0.4rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 0;
+}
+
+.file-list-toggle:hover {
+  color: var(--accent);
+  background: transparent;
+}
+
+.file-list-toggle-icon {
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  /* Same chevron as the sidebar toggle; rotate to point up when open. */
+  transform: rotate(-90deg);
+}
+
+.file-list-toggle-icon.is-collapsed {
+  /* Point down when the pane is closed. */
+  transform: rotate(90deg);
+}
+
+.file-list h3 {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 0.15rem 0.15rem 0.4rem 0.25rem;
   font-family: var(--mono);
   font-size: 0.68rem;
   font-weight: 600;
@@ -1188,6 +1336,7 @@ body.is-file-list-resizing iframe {
   text-transform: uppercase;
   color: var(--muted);
   border-bottom: 0;
+  white-space: nowrap;
 }
 
 .file-list .empty {
@@ -1237,16 +1386,10 @@ body.is-file-list-resizing iframe {
 .file-tree-dir,
 .file-tree-file {
   position: relative;
+  isolation: isolate;
   width: 100%;
   border: 0;
-  /* Opaque fill from the tree line keeps glyph rasterization stable on hover
-     (transparent → muted backgrounds shift text ~1px under subpixel AA). */
-  background-color: transparent;
-  background-image: linear-gradient(
-    to right,
-    transparent var(--tree-hover-inset, 0px),
-    var(--surface) var(--tree-hover-inset, 0px)
-  );
+  background: transparent;
   display: flex;
   gap: 0.3rem;
   align-items: center;
@@ -1260,7 +1403,7 @@ body.is-file-list-resizing iframe {
   font-size: 0.75rem;
   line-height: 1.2;
   min-height: 1.5rem;
-  border-radius: var(--radius);
+  border-radius: 0;
   z-index: 0;
 }
 
@@ -1269,16 +1412,24 @@ body.is-file-list-resizing iframe {
   font-weight: 500;
 }
 
-.file-tree-dir:hover,
-.file-tree-file:hover,
-.file-tree-file.active,
-.file-tree-file.active:hover {
-  background-image: linear-gradient(
-    to right,
-    transparent var(--tree-hover-inset, 0px),
-    var(--surface-muted) var(--tree-hover-inset, 0px)
-  );
-  box-shadow: none;
+.file-tree-dir:hover::before,
+.file-tree-file:hover::before,
+.file-tree-file.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: var(--tree-hover-inset, 0px);
+  z-index: -1;
+  border-radius: var(--radius);
+  background: var(--file-tree-row-hover);
+  pointer-events: none;
+}
+
+.file-tree-file.active::before,
+.file-tree-file.active:hover::before {
+  background: var(--file-tree-row-active);
 }
 
 .file-tree-chevron {
@@ -1408,15 +1559,19 @@ body.is-file-list-resizing iframe {
 }
 
 .diff-file-header {
+  position: sticky;
+  top: var(--sticky-top);
+  z-index: 12;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 0.5rem 1.1rem 0.5rem 0.75rem;
+  padding: var(--diff-file-header-pad-y, 0.55rem) 1.1rem;
+  padding-left: 0;
   border-bottom: 1px solid var(--border);
   font-family: var(--mono);
   font-size: 0.8rem;
-  background: var(--surface-muted);
+  background: var(--surface);
 }
 
 .diff-file-title {
@@ -1783,15 +1938,32 @@ body.is-file-list-resizing iframe {
     flex-direction: column;
   }
 
+  .diff-layout {
+    display: flex;
+    flex-direction: column;
+  }
+
   .commit-list,
+  .file-list-chip,
   .file-list {
     position: static;
     height: auto;
     max-height: 280px;
   }
 
-  .file-list-resize {
-    display: none;
+  .file-list-chip,
+  .file-list {
+    order: -1;
+    width: 100%;
+    max-width: none;
+    margin: 0 0 0.75rem;
+    justify-self: stretch;
+  }
+
+  .file-list-chip {
+    height: 1.6rem;
+    max-height: 1.6rem;
+    width: max-content;
   }
 
   .diff-files {

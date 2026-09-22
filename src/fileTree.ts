@@ -5,6 +5,8 @@ export type FileTreeFileNode = {
   name: string
   path: string
   file: DiffFile
+  /** Index in the flat diff file list (for stable ordering). */
+  order: number
 }
 
 export type FileTreeDirNode = {
@@ -12,6 +14,8 @@ export type FileTreeDirNode = {
   name: string
   path: string
   children: FileTreeNode[]
+  /** Earliest file index under this directory. */
+  order: number
 }
 
 export type FileTreeNode = FileTreeDirNode | FileTreeFileNode
@@ -22,52 +26,62 @@ type MutableDir = {
   path: string
   dirs: Map<string, MutableDir>
   files: Map<string, FileTreeFileNode>
+  order: number
 }
 
-function createDir(name: string, path: string): MutableDir {
-  return { kind: 'dir', name, path, dirs: new Map(), files: new Map() }
+function createDir(name: string, path: string, order: number): MutableDir {
+  return { kind: 'dir', name, path, dirs: new Map(), files: new Map(), order }
 }
 
-function compareNodes(a: FileTreeNode, b: FileTreeNode): number {
-  if (a.kind !== b.kind) return a.kind === 'dir' ? -1 : 1
-  return a.name.localeCompare(b.name)
+function compareByOrder(a: FileTreeNode, b: FileTreeNode): number {
+  return a.order - b.order
 }
 
 function finalize(dir: MutableDir): FileTreeDirNode {
   const children: FileTreeNode[] = [
     ...[...dir.dirs.values()].map(finalize),
     ...dir.files.values(),
-  ].sort(compareNodes)
+  ].sort(compareByOrder)
   return {
     kind: 'dir',
     name: dir.name,
     path: dir.path,
     children,
+    order: dir.order,
   }
 }
 
 export function buildFileTree(files: DiffFile[]): FileTreeNode[] {
-  const root = createDir('', '')
+  const root = createDir('', '', Number.POSITIVE_INFINITY)
 
-  for (const file of files) {
+  files.forEach((file, index) => {
     const parts = file.path.split('/').filter(Boolean)
-    if (parts.length === 0) continue
+    if (parts.length === 0) return
 
     let dir = root
+    dir.order = Math.min(dir.order, index)
     for (let i = 0; i < parts.length - 1; i++) {
       const segment = parts[i]!
       const nextPath = parts.slice(0, i + 1).join('/')
       let next = dir.dirs.get(segment)
       if (!next) {
-        next = createDir(segment, nextPath)
+        next = createDir(segment, nextPath, index)
         dir.dirs.set(segment, next)
+      } else {
+        next.order = Math.min(next.order, index)
       }
       dir = next
     }
 
     const name = parts[parts.length - 1]!
-    dir.files.set(name, { kind: 'file', name, path: file.path, file })
-  }
+    dir.files.set(name, {
+      kind: 'file',
+      name,
+      path: file.path,
+      file,
+      order: index,
+    })
+  })
 
   return finalize(root).children
 }

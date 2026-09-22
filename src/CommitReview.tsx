@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -8,7 +7,6 @@ import {
   type CSSProperties,
   type FocusEvent,
   type MouseEvent,
-  type PointerEvent as ReactPointerEvent,
 } from 'react'
 import type {
   Comment,
@@ -508,9 +506,12 @@ function FileTree({
   return (
     <ul className={depth === 0 ? 'file-tree' : 'file-tree-nested'} role={depth === 0 ? 'tree' : 'group'}>
       {nodes.map((node) => {
-        // Indent content; hover fill insets to the parent rail / file branch start.
+        // Indent content; hover/active fill starts after the horizontal branch tip.
         const padLeft = `${0.45 + depth * 0.7}rem`
-        const hoverInset = depth > 0 ? `${0.45 + (depth - 1) * 0.7 + 0.28}rem` : '0'
+        const branchLeftRem = depth > 0 ? 0.45 + (depth - 1) * 0.7 + 0.28 : 0
+        const branchWidthRem = 0.95
+        const hoverInset =
+          depth > 0 ? `${branchLeftRem + branchWidthRem}rem` : '0px'
         const rowStyle = {
           paddingLeft: padLeft,
           ['--tree-hover-inset' as string]: hoverInset,
@@ -784,34 +785,56 @@ function FileDiffSection({
 }
 
 const SCROLL_SPY_OFFSET = 96
-
-const FILE_LIST_WIDTH_KEY = 'branch-review.fileListWidth'
-const FILE_LIST_WIDTH_DEFAULT = 260
-const FILE_LIST_WIDTH_MIN = 160
 const FILE_LIST_WIDTH_MAX = 480
 
-function clampFileListWidth(value: number): number {
-  return Math.min(FILE_LIST_WIDTH_MAX, Math.max(FILE_LIST_WIDTH_MIN, Math.round(value)))
-}
+/** Intrinsic width needed to show every visible name (and badge) without clipping. */
+function measureFileListContentWidth(list: HTMLElement): number {
+  const listLeft = list.getBoundingClientRect().left
+  const listStyle = getComputedStyle(list)
+  const padRight = Number.parseFloat(listStyle.paddingRight) || 0
+  const borderRight = Number.parseFloat(listStyle.borderRightWidth) || 0
+  // border-box width must cover content end + list padding-right + border-right.
+  const trailing = padRight + borderRight
+  let needed = 0
 
-function readStoredFileListWidth(): number {
-  try {
-    const raw = localStorage.getItem(FILE_LIST_WIDTH_KEY)
-    if (raw == null) return FILE_LIST_WIDTH_DEFAULT
-    const parsed = Number(raw)
-    if (!Number.isFinite(parsed)) return FILE_LIST_WIDTH_DEFAULT
-    return clampFileListWidth(parsed)
-  } catch {
-    return FILE_LIST_WIDTH_DEFAULT
+  const heading = list.querySelector('h3') as HTMLElement | null
+  if (heading) {
+    needed = Math.max(
+      needed,
+      heading.getBoundingClientRect().left + heading.scrollWidth - listLeft + trailing,
+    )
   }
-}
 
-function writeStoredFileListWidth(value: number): void {
-  try {
-    localStorage.setItem(FILE_LIST_WIDTH_KEY, String(clampFileListWidth(value)))
-  } catch {
-    /* ignore */
+  for (const name of list.querySelectorAll('.file-tree-name')) {
+    const el = name as HTMLElement
+    const row = el.closest('.file-tree-file, .file-tree-dir') as HTMLElement | null
+    if (!row) continue
+
+    const rowStyle = getComputedStyle(row)
+    const rowPadRight = Number.parseFloat(rowStyle.paddingRight) || 0
+    const gap = Number.parseFloat(rowStyle.columnGap || rowStyle.gap) || 0
+    const badge = row.querySelector('.badge') as HTMLElement | null
+
+    // scrollWidth equals the flex slot when text is not clipped; use a Range for
+    // the real glyph width so short labels do not inflate, and long ones stay exact.
+    let nameWidth = el.scrollWidth
+    if (el.scrollWidth <= el.clientWidth + 1) {
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      nameWidth = range.getBoundingClientRect().width
+    }
+
+    let contentEnd = el.getBoundingClientRect().left + nameWidth
+    if (badge) {
+      contentEnd += gap + badge.getBoundingClientRect().width
+    }
+    contentEnd += rowPadRight
+
+    needed = Math.max(needed, contentEnd - listLeft + trailing)
   }
+
+  // Subpixel AA / rounding can still clip by a hair without a small buffer.
+  return Math.min(FILE_LIST_WIDTH_MAX, Math.ceil(needed + 1))
 }
 
 export function CommitReview({
@@ -845,57 +868,43 @@ export function CommitReview({
   const [error, setError] = useState<string | null>(null)
   const scrollingToRef = useRef<string | null>(null)
   const [nameHover, setNameHover] = useState<NameHover | null>(null)
-  const [fileListWidth, setFileListWidth] = useState(readStoredFileListWidth)
-  const fileListWidthRef = useRef(fileListWidth)
-  fileListWidthRef.current = fileListWidth
+  const fileListRef = useRef<HTMLElement | null>(null)
+  const fileListWidthFloorRef = useRef(0)
+  const fileListWidthShaRef = useRef(commit.sha)
+  const [fileListWidth, setFileListWidth] = useState(0)
+  const [fileListCollapsed, setFileListCollapsed] = useState(false)
+  const [fileListScrollHidden, setFileListScrollHidden] = useState(false)
+  const fileListCollapsedRef = useRef(fileListCollapsed)
+  fileListCollapsedRef.current = fileListCollapsed
 
-  const onFileListResizePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return
-    event.preventDefault()
-    const handle = event.currentTarget
-    const startX = event.clientX
-    const startWidth = fileListWidthRef.current
-    handle.setPointerCapture(event.pointerId)
-    document.body.classList.add('is-file-list-resizing')
+  function toggleFileListCollapsed() {
+    setFileListCollapsed((prev) => {
+      if (prev) setFileListScrollHidden(false)
+      return !prev
+    })
+  }
 
-    const onMove = (ev: PointerEvent) => {
-      setFileListWidth(clampFileListWidth(startWidth + (ev.clientX - startX)))
+  function onFileListChipClick() {
+    if (fileListCollapsed) {
+      setFileListCollapsed(false)
+      setFileListScrollHidden(false)
+      return
     }
-    const onUp = (ev: PointerEvent) => {
-      handle.releasePointerCapture(ev.pointerId)
-      handle.removeEventListener('pointermove', onMove)
-      handle.removeEventListener('pointerup', onUp)
-      handle.removeEventListener('pointercancel', onUp)
-      document.body.classList.remove('is-file-list-resizing')
-      writeStoredFileListWidth(fileListWidthRef.current)
-    }
+    // Expanded but faded: bring the pane back.
+    if (fileListScrollHidden) setFileListScrollHidden(false)
+  }
 
-    handle.addEventListener('pointermove', onMove)
-    handle.addEventListener('pointerup', onUp)
-    handle.addEventListener('pointercancel', onUp)
-  }, [])
-
-  const snapFileListToContent = useCallback(() => {
-    const list = document.querySelector('.file-list') as HTMLElement | null
-    const tree = list?.querySelector('.file-tree') as HTMLElement | null
-    if (!list || !tree) return
-    const listLeft = list.getBoundingClientRect().left
-    let needed = FILE_LIST_WIDTH_MIN
-    for (const name of tree.querySelectorAll('.file-tree-name')) {
-      const el = name as HTMLElement
-      const rect = el.getBoundingClientRect()
-      const row = el.closest('.file-tree-file, .file-tree-dir') as HTMLElement | null
-      const badge = row?.querySelector('.badge') as HTMLElement | null
-      const badgeWidth = badge ? badge.getBoundingClientRect().width + 8 : 0
-      needed = Math.max(
-        needed,
-        rect.left - listLeft + el.scrollWidth + badgeWidth + 14,
-      )
+  function onFileListChipToggleClick(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation()
+    // Pane is faded: first click restores it (chip looks collapsed while faded).
+    if (!fileListCollapsed && fileListScrollHidden) {
+      setFileListScrollHidden(false)
+      return
     }
-    const next = clampFileListWidth(needed)
-    setFileListWidth(next)
-    writeStoredFileListWidth(next)
-  }, [])
+    toggleFileListCollapsed()
+  }
+
+  const chipCaretCollapsed = fileListCollapsed || fileListScrollHidden
 
   const fileTree = useMemo(() => buildFileTree(files), [files])
 
@@ -993,7 +1002,69 @@ export function CommitReview({
     clearDrafts()
     setExpandedDirs(new Set(collectDirPaths(fileTree)))
     setNameHover(null)
+    setFileListCollapsed(false)
+    setFileListScrollHidden(window.scrollY > 8)
   }, [commit.sha, files, fileTree, initialFilePath])
+
+  // Grow the floating file list to fit visible labels; never shrink on collapse.
+  useLayoutEffect(() => {
+    if (fileListCollapsed) return
+    const list = fileListRef.current
+    if (!list) return
+
+    if (fileListWidthShaRef.current !== commit.sha) {
+      fileListWidthShaRef.current = commit.sha
+      fileListWidthFloorRef.current = 0
+    }
+
+    const needed = measureFileListContentWidth(list)
+    const next = Math.max(fileListWidthFloorRef.current, needed)
+    fileListWidthFloorRef.current = next
+    setFileListWidth((prev) => (prev === next ? prev : next))
+  }, [commit.sha, expandedDirs, files, commentCounts, fileTree, fileListCollapsed])
+
+  useEffect(() => {
+    let lastY = window.scrollY
+    let traveled = 0
+    let settleTimer = 0
+
+    const atTop = () => window.scrollY <= 8
+
+    const onScroll = () => {
+      if (fileListCollapsedRef.current) return
+
+      const y = window.scrollY
+      traveled += Math.abs(y - lastY)
+      lastY = y
+
+      if (atTop() || fileListRef.current?.matches(':hover')) {
+        traveled = 0
+        setFileListScrollHidden(false)
+      } else if (traveled > 24) {
+        // Show while the user is actively scrolling.
+        setFileListScrollHidden(false)
+      }
+
+      window.clearTimeout(settleTimer)
+      settleTimer = window.setTimeout(() => {
+        traveled = 0
+        if (fileListCollapsedRef.current) return
+        // Hide when idle away from the top (unless the pane is hovered).
+        if (!atTop() && !fileListRef.current?.matches(':hover')) {
+          setFileListScrollHidden(true)
+        }
+      }, 450)
+    }
+
+    // Start hidden unless we are already at the top.
+    setFileListScrollHidden(!atTop())
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      window.clearTimeout(settleTimer)
+    }
+  }, [])
 
   useEffect(() => {
     onFilePathChange?.(activePath || null)
@@ -1295,52 +1366,12 @@ export function CommitReview({
 
       <div
         className="diff-layout"
-        style={{ '--file-list-width': `${fileListWidth}px` } as CSSProperties}
+        style={
+          {
+            '--file-list-width': fileListWidth > 0 ? `${fileListWidth}px` : 'max-content',
+          } as CSSProperties
+        }
       >
-        <aside className="file-list">
-          <h3>
-            {files.length} {files.length === 1 ? 'file' : 'files'}
-          </h3>
-          {files.length === 0 ? (
-            <p className="empty">No files in this commit.</p>
-          ) : (
-            <FileTree
-              nodes={fileTree}
-              depth={0}
-              activePath={activePath || undefined}
-              expanded={expandedDirs}
-              commentCounts={commentCounts}
-              overflowHoverPath={nameHover?.path ?? null}
-              onToggleDir={toggleDir}
-              onSelectFile={selectFile}
-              onNameHover={handleNameHover}
-              onNameLeave={handleNameLeave}
-            />
-          )}
-        </aside>
-        <div
-          className="file-list-resize"
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize file list"
-          aria-valuemin={FILE_LIST_WIDTH_MIN}
-          aria-valuemax={FILE_LIST_WIDTH_MAX}
-          aria-valuenow={fileListWidth}
-          tabIndex={0}
-          onPointerDown={onFileListResizePointerDown}
-          onDoubleClick={(e) => {
-            e.preventDefault()
-            snapFileListToContent()
-          }}
-          onKeyDown={(e) => {
-            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
-            e.preventDefault()
-            const delta = e.key === 'ArrowRight' ? 16 : -16
-            const next = clampFileListWidth(fileListWidthRef.current + delta)
-            setFileListWidth(next)
-            writeStoredFileListWidth(next)
-          }}
-        />
         <div className="diff-files">
           {files.length === 0 ? (
             <p className="empty">No files in this commit.</p>
@@ -1380,6 +1411,90 @@ export function CommitReview({
             ))
           )}
         </div>
+        <aside
+          className="file-list-chip"
+          onClick={onFileListChipClick}
+        >
+          <div className="file-list-heading">
+            <h3>
+              {files.length} {files.length === 1 ? 'file' : 'files'}
+            </h3>
+            <button
+              type="button"
+              className="file-list-toggle"
+              aria-expanded={!fileListCollapsed && !fileListScrollHidden}
+              aria-label={chipCaretCollapsed ? 'Expand file list' : 'Collapse file list'}
+              title={chipCaretCollapsed ? 'Expand file list' : 'Collapse file list'}
+              onClick={onFileListChipToggleClick}
+            >
+              <svg
+                className={`file-list-toggle-icon${chipCaretCollapsed ? ' is-collapsed' : ''}`}
+                viewBox="0 0 16 16"
+                aria-hidden="true"
+              >
+                <path
+                  d="M6.5 3.25 11 8l-4.5 4.75"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </aside>
+        {!fileListCollapsed ? (
+          <aside
+            className={`file-list${fileListScrollHidden ? ' is-scroll-hidden' : ''}`}
+            ref={fileListRef}
+          >
+            <div className="file-list-heading">
+              <h3>
+                {files.length} {files.length === 1 ? 'file' : 'files'}
+              </h3>
+              <button
+                type="button"
+                className="file-list-toggle"
+                aria-expanded={true}
+                aria-label="Collapse file list"
+                title="Collapse file list"
+                onClick={toggleFileListCollapsed}
+              >
+                <svg
+                  className="file-list-toggle-icon"
+                  viewBox="0 0 16 16"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M6.5 3.25 11 8l-4.5 4.75"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+            {files.length === 0 ? (
+              <p className="empty">No files in this commit.</p>
+            ) : (
+              <FileTree
+                nodes={fileTree}
+                depth={0}
+                activePath={activePath || undefined}
+                expanded={expandedDirs}
+                commentCounts={commentCounts}
+                overflowHoverPath={nameHover?.path ?? null}
+                onToggleDir={toggleDir}
+                onSelectFile={selectFile}
+                onNameHover={handleNameHover}
+                onNameLeave={handleNameLeave}
+              />
+            )}
+          </aside>
+        ) : null}
       </div>
       {nameHover ? (
         <div
