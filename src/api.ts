@@ -172,3 +172,10 @@ export function upsertMessageEdit(
     body: JSON.stringify(patch),
   })
 }
+
+export function setReviewed(sha: string, reviewed: boolean) {
+  return request<CommentsFile>(`/api/reviewed/${encodeURIComponent(sha)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ reviewed }),
+  })
+}

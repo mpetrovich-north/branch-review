@@ -18,6 +18,7 @@ import {
   isConfigReady,
   readComments,
   readConfig,
+  setReviewed,
   updateComment,
   upsertMessageEdit,
   writeConfig,
@@ -302,6 +303,26 @@ app.put(
       return
     }
     const file = await upsertMessageEdit(
+      repoPath,
+      config.reviewBranch,
+      config.baseBranch,
+      String(req.params.sha),
+      req.body,
+    )
+    res.json(file)
+  }),
+)
+
+app.put(
+  '/api/reviewed/:sha',
+  asyncHandler(async (req, res) => {
+    const repoPath = await resolveRepo(req)
+    const config = await readConfig(repoPath)
+    if (!isConfigReady(config)) {
+      res.status(400).json({ error: 'Set reviewBranch and baseBranch in config first' })
+      return
+    }
+    const file = await setReviewed(
       repoPath,
       config.reviewBranch,
       config.baseBranch,

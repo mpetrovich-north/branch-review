@@ -227,3 +227,46 @@ export function TrashIcon(props: IconProps) {
   )
 }
 
+export function CheckboxIcon({
+  checked = false,
+  ...props
+}: IconProps & { checked?: boolean }) {
+  return (
+    <Svg {...props}>
+      <rect
+        x="2.25"
+        y="2.25"
+        width="11.5"
+        height="11.5"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        fill={checked ? 'currentColor' : 'none'}
+      />
+      {checked ? (
+        <path
+          d="M5.1 8.15 7.05 10.1 11 5.9"
+          stroke="var(--surface)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ) : null}
+    </Svg>
+  )
+}
+
+export function CheckIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M3.5 8.25 6.6 11.25 12.5 4.75"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
+}
+

@@ -20,7 +20,8 @@
   "baseBranch": "main",
   "updatedAt": "2026-09-17T20:00:00.000Z",
   "comments": [],
-  "messageEdits": {}
+  "messageEdits": {},
+  "reviewedShas": []
 }
 ```
 
@@ -97,3 +98,15 @@ Optional map of commit SHA → overlay for the subject and/or body. Missing keys
 - Omit `subject` or `body` when that field is not overridden.
 - An empty `body` string means the description is intentionally blank.
 - Remove the SHA entry (or the field) to reset to git.
+
+### Reviewed commits
+
+Optional list of full commit SHAs the reviewer marked as reviewed. Local progress only; does not block Apply and does not require comments to be cleared. Missing field or empty array means none reviewed. Orphan SHAs after rebase/amend are left in place (same as comments and message edits).
+
+```json
+{
+  "reviewedShas": [
+    "abc1234def5678..."
+  ]
+}
+```

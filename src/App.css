@@ -315,7 +315,7 @@ pre,
 .main-pane {
   position: relative;
   overflow: visible;
-  padding: 0.85rem 1.1rem 1.75rem;
+  padding: 0.85rem 0 1.75rem 1.1rem;
   min-width: 0;
   background: var(--surface);
 }
@@ -578,6 +578,20 @@ pre,
   opacity: 0.85;
 }
 
+.commit-list .idx.is-reviewed {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--status-added);
+  opacity: 1;
+  padding-top: 0.15rem;
+}
+
+.commit-list .idx.is-reviewed .commit-reviewed-icon {
+  width: 14px;
+  height: 14px;
+}
+
 .commit-list .subject {
   font-size: 0.85rem;
   color: inherit;
@@ -619,7 +633,7 @@ pre,
   border: 0;
   border-bottom: 1px solid var(--border);
   border-radius: 0;
-  padding: 0.15rem 0 0.85rem;
+  padding: 0.15rem 1.1rem 0.85rem 0;
   margin-bottom: 0.85rem;
 }
 
@@ -833,6 +847,45 @@ pre,
   height: 14px;
 }
 
+.reviewed-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  height: 1.6rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.reviewed-toggle:hover:not(:disabled) {
+  color: var(--status-added);
+  border-color: var(--status-added);
+}
+
+.reviewed-toggle.is-reviewed {
+  color: var(--status-added);
+  border-color: color-mix(in srgb, var(--status-added) 55%, var(--border));
+  background: color-mix(in srgb, var(--status-added) 12%, var(--surface));
+}
+
+.reviewed-toggle:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.reviewed-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+
 .comment-bubble.commit-edit-trigger {
   width: 1.15rem;
   height: 1.15rem;
@@ -897,7 +950,8 @@ pre,
 .diff-file {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-right: 0;
+  border-radius: var(--radius) 0 0 var(--radius);
   overflow: visible;
   min-width: 0;
   scroll-margin-top: 12px;
@@ -1173,7 +1227,7 @@ body.is-file-list-resizing iframe {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 1.1rem 0.5rem 0.75rem;
   border-bottom: 1px solid var(--border);
   font-family: var(--mono);
   font-size: 0.8rem;

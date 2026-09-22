@@ -13,7 +13,7 @@ import {
   setActiveRepoPath,
 } from './api'
 import { CommitReview } from './CommitReview'
-import { CommitIcon, MoonIcon, SunIcon } from './icons'
+import { CommitIcon, CheckIcon, MoonIcon, SunIcon } from './icons'
 import { effectiveTheme, toggleStoredTheme, type ThemePreference } from './theme'
 import type {
   Comment,
@@ -145,6 +145,7 @@ export default function App() {
   const [files, setFiles] = useState<DiffFile[]>([])
   const [comments, setComments] = useState<Comment[]>([])
   const [messageEdits, setMessageEdits] = useState<Record<string, MessageEdit>>({})
+  const [reviewedShas, setReviewedShas] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [diffLoading, setDiffLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -172,6 +173,7 @@ export default function App() {
     setCommits(commitRes.commits)
     setComments(commentRes.comments)
     setMessageEdits(commentRes.messageEdits ?? {})
+    setReviewedShas(commentRes.reviewedShas ?? [])
     setSelectedSha((prev) => {
       const fromUrl = matchCommitSha(commitRes.commits, preferShaRef.current)
       if (fromUrl) {
@@ -427,6 +429,8 @@ export default function App() {
     [meta?.branches, baseDraft],
   )
 
+  const reviewedSet = useMemo(() => new Set(reviewedShas), [reviewedShas])
+
   async function onRepoChange(next: string) {
     if (next === CHANGE_DIRECTORY_VALUE) {
       await changeScanDirectory()
@@ -668,7 +672,13 @@ export default function App() {
                             setSelectedSha(c.sha)
                           }}
                         >
-                          <span className="idx">{i + 1}</span>
+                          <span className={`idx${reviewedSet.has(c.sha) ? ' is-reviewed' : ''}`}>
+                            {reviewedSet.has(c.sha) ? (
+                              <CheckIcon className="commit-reviewed-icon" title="Reviewed" />
+                            ) : (
+                              i + 1
+                            )}
+                          </span>
                           <span className="subject">
                             {messageEdits[c.sha]?.subject ?? c.subject}
                           </span>
@@ -723,9 +733,11 @@ export default function App() {
                 files={files}
                 comments={comments}
                 messageEdit={messageEdits[selected.sha]}
+                reviewed={reviewedSet.has(selected.sha)}
                 onReviewFileChange={(file) => {
                   setComments(file.comments)
                   setMessageEdits(file.messageEdits ?? {})
+                  setReviewedShas(file.reviewedShas ?? [])
                 }}
                 initialFilePath={seedFilePath}
                 onFilePathChange={setActiveFilePath}

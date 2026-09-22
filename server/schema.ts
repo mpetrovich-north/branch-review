@@ -53,6 +53,11 @@ export const commentsFileSchema = z.object({
   updatedAt: z.string().datetime(),
   comments: z.array(commentSchema),
   messageEdits: z.record(z.string(), messageEditSchema).default({}),
+  reviewedShas: z.array(z.string().min(1)).default([]),
+})
+
+export const setReviewedSchema = z.object({
+  reviewed: z.boolean(),
 })
 
 export const configSchema = z.object({

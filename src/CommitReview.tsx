@@ -20,9 +20,10 @@ import type {
   LineType,
   MessageEdit,
 } from './types'
-import { createComment, removeComment, updateComment, upsertMessageEdit } from './api'
+import { createComment, removeComment, setReviewed, updateComment, upsertMessageEdit } from './api'
 import { buildFileTree, collectDirPaths, type FileTreeNode } from './fileTree'
 import {
+  CheckboxIcon,
   CommentBubbleIcon,
   CommitIcon,
   EditIcon,
@@ -92,6 +93,7 @@ type Props = {
   files: DiffFile[]
   comments: Comment[]
   messageEdit: MessageEdit | undefined
+  reviewed: boolean
   onReviewFileChange: (file: CommentsFile) => void
   initialFilePath?: string | null
   onFilePathChange?: (path: string | null) => void
@@ -807,6 +809,7 @@ export function CommitReview({
   files,
   comments,
   messageEdit,
+  reviewed,
   onReviewFileChange,
   initialFilePath,
   onFilePathChange,
@@ -1144,6 +1147,19 @@ export function CommitReview({
     }
   }
 
+  async function toggleReviewed() {
+    setBusy(true)
+    setError(null)
+    try {
+      const file = await setReviewed(commit.sha, !reviewed)
+      onReviewFileChange(file)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update reviewed state')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="commit-review">
       <section className="commit-message-panel">
@@ -1183,6 +1199,18 @@ export function CommitReview({
             >
               <CommentBubbleIcon />
               Comment
+            </button>
+            <button
+              type="button"
+              className={`reviewed-toggle${reviewed ? ' is-reviewed' : ''}`}
+              title={reviewed ? 'Mark as not reviewed' : 'Mark as reviewed'}
+              aria-label={reviewed ? 'Mark as not reviewed' : 'Mark as reviewed'}
+              aria-pressed={reviewed}
+              disabled={busy}
+              onClick={() => void toggleReviewed()}
+            >
+              <CheckboxIcon checked={reviewed} />
+              Reviewed
             </button>
             <div className="commit-nav">
               <button

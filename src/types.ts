@@ -43,6 +43,7 @@ export type CommentsFile = {
   updatedAt: string
   comments: Comment[]
   messageEdits: Record<string, MessageEdit>
+  reviewedShas: string[]
 }
 
 export type ReviewConfig = {

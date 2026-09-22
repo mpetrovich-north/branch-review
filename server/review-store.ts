@@ -7,6 +7,7 @@ import {
   createCommentSchema,
   storedConfigSchema,
   updateCommentSchema,
+  setReviewedSchema,
   upsertMessageEditSchema,
   type Comment,
   type CommentsFile,
@@ -79,6 +80,7 @@ function emptyCommentsFile(branch: string, baseBranch: string): CommentsFile {
     updatedAt: new Date().toISOString(),
     comments: [],
     messageEdits: {},
+    reviewedShas: [],
   }
 }
 
@@ -230,6 +232,27 @@ export async function upsertMessageEdit(
   }
 
   file.messageEdits = edits
+  file.baseBranch = baseBranch
+  file.branch = branch
+  return writeCommentsFile(repoPath, file)
+}
+
+export async function setReviewed(
+  repoPath: string,
+  branch: string,
+  baseBranch: string,
+  commitSha: string,
+  input: unknown,
+): Promise<CommentsFile> {
+  const data = setReviewedSchema.parse(input)
+  const file = await readComments(repoPath, branch, baseBranch)
+  const set = new Set(file.reviewedShas ?? [])
+  if (data.reviewed) {
+    set.add(commitSha)
+  } else {
+    set.delete(commitSha)
+  }
+  file.reviewedShas = [...set]
   file.baseBranch = baseBranch
   file.branch = branch
   return writeCommentsFile(repoPath, file)
