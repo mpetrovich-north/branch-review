@@ -454,8 +454,8 @@ pre,
   align-items: center;
   justify-content: space-between;
   gap: 0.35rem;
-  /* Match main-pane top inset so the title sits with the commit subject. */
-  padding: 0.85rem 0.85rem 0.55rem;
+  /* Sit with the commit subject (main-pane inset + message-panel top inset). */
+  padding: 1rem 0.85rem 0.55rem;
   min-height: 2.75rem;
   border-bottom: 0;
 }
@@ -526,7 +526,7 @@ pre,
 
 .commit-list.is-collapsed .commit-list-header {
   justify-content: center;
-  padding: 0.85rem 0.25rem 0.55rem;
+  padding: 1rem 0.25rem 0.55rem;
   border: none;
   box-shadow: none;
 }
@@ -813,6 +813,11 @@ pre,
   visibility: hidden;
   pointer-events: none;
   cursor: default;
+}
+
+.commit-display-subject {
+  /* Cancel .commit-display-content top padding so the h2 matches .commit-list-title. */
+  margin-top: -0.35rem;
 }
 
 .commit-display-subject .commit-display-main {
