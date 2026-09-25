@@ -289,3 +289,25 @@ export function CheckIcon(props: IconProps) {
   )
 }
 
+/** Undo: from bottom-left → right → up → arrowhead pointing left. */
+export function UndoIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M3.75 11.25h5.5a3.75 3.75 0 0 0 0-7.5H5.35"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7.2 2.35 4.5 3.75 7.2 5.15"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
+}
+

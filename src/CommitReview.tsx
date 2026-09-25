@@ -33,6 +33,7 @@ import {
   FolderIcon,
   StatusIcon,
   TrashIcon,
+  UndoIcon,
 } from './icons'
 import { useHighlightedDiff, type LineTokens } from './highlight'
 import { countFileDiffStats, DiffStat, sumDiffStats } from './DiffStat'
@@ -383,6 +384,56 @@ function lineNumberFor(line: DiffFile['lines'][number]): number | null {
   return null
 }
 
+function commentStartLine(comment: LineComment): number {
+  if (comment.startLine !== undefined) return comment.startLine
+  // Recover multi-line extent when startLine was omitted but snippet has N lines.
+  if (comment.snippet) {
+    const extraLines = comment.snippet.split('\n').length - 1
+    if (extraLines > 0) return Math.max(1, comment.line - extraLines)
+  }
+  return comment.line
+}
+
+function isCommentableLine(
+  line: DiffFile['lines'][number],
+): line is DiffFile['lines'][number] & { type: LineType } {
+  return line.type === 'added' || line.type === 'removed' || line.type === 'unchanged'
+}
+
+/**
+ * Farthest display index from `anchorIdx` toward `targetIdx` that stays a
+ * contiguous run of the same commentable `lineType` (no meta / other sides).
+ */
+function contiguousRangeEnd(
+  lines: DiffFile['lines'],
+  anchorIdx: number,
+  targetIdx: number,
+  lineType: LineType,
+): number {
+  if (targetIdx === anchorIdx) return anchorIdx
+  const step = targetIdx > anchorIdx ? 1 : -1
+  let end = anchorIdx
+  for (let i = anchorIdx + step; step > 0 ? i <= targetIdx : i >= targetIdx; i += step) {
+    const line = lines[i]
+    if (!line || !isCommentableLine(line) || line.type !== lineType) break
+    if (lineNumberFor(line) === null) break
+    end = i
+  }
+  return end
+}
+
+function rangeSnippet(lines: DiffFile['lines'], startIdx: number, endIdx: number): string {
+  const lo = Math.min(startIdx, endIdx)
+  const hi = Math.max(startIdx, endIdx)
+  const parts: string[] = []
+  for (let i = lo; i <= hi; i++) {
+    const line = lines[i]
+    if (!line || !isCommentableLine(line)) continue
+    parts.push(line.content)
+  }
+  return parts.join('\n')
+}
+
 function LineCode({
   content,
   tokens,
@@ -407,7 +458,7 @@ function LineCode({
   )
 }
 
-function matchesLineComment(
+function isLineInCommentRange(
   comment: LineComment,
   filePath: string,
   line: DiffFile['lines'][number],
@@ -415,7 +466,63 @@ function matchesLineComment(
   if (comment.path !== filePath) return false
   if (comment.lineType !== line.type) return false
   const n = lineNumberFor(line)
-  return n !== null && n === comment.line
+  if (n === null) return false
+  return n >= commentStartLine(comment) && n <= comment.line
+}
+
+/**
+ * True for the last display row that belongs to this comment's line range.
+ * Prefer this over line-number equality so the thread sits under the bottom
+ * of the highlighted block even if line numbers are unusual.
+ */
+function isCommentAnchorRow(
+  comment: LineComment,
+  filePath: string,
+  lines: DiffFile['lines'],
+  idx: number,
+): boolean {
+  const line = lines[idx]
+  if (!line || !isLineInCommentRange(comment, filePath, line)) return false
+  for (let j = idx + 1; j < lines.length; j++) {
+    const later = lines[j]
+    if (!later || later.type === 'meta') continue
+    if (isLineInCommentRange(comment, filePath, later)) return false
+    // Contiguous same-type ranges never resume after a gap of other lines.
+    if (isCommentableLine(later)) break
+  }
+  return true
+}
+
+/**
+ * Inclusive display-index span for a line comment: contiguous same-type rows
+ * from the first in-range line through the anchor row.
+ */
+function commentDisplayRange(
+  comment: LineComment,
+  filePath: string,
+  lines: DiffFile['lines'],
+): { lo: number; hi: number } | null {
+  if (comment.path !== filePath) return null
+  let hi = -1
+  for (let i = 0; i < lines.length; i++) {
+    if (isCommentAnchorRow(comment, filePath, lines, i)) {
+      hi = i
+      break
+    }
+  }
+  if (hi < 0) return null
+
+  const startNo = commentStartLine(comment)
+  const endNo = comment.line
+  let lo = hi
+  for (let i = hi - 1; i >= 0; i--) {
+    const row = lines[i]
+    if (!row || !isCommentableLine(row) || row.type !== comment.lineType) break
+    const n = lineNumberFor(row)
+    if (n === null || n < startNo || n > endNo) break
+    lo = i
+  }
+  return { lo, hi }
 }
 
 function formatCommitTime(iso: string): string {
@@ -465,6 +572,7 @@ function EditableComment({
   onSave,
   onResolve,
   onDelete,
+  onHoverChange,
   className,
 }: {
   comment: Comment
@@ -472,6 +580,7 @@ function EditableComment({
   onSave: (id: string, body: string) => Promise<void>
   onResolve: (id: string, resolved: boolean) => Promise<void>
   onDelete: (id: string) => Promise<void>
+  onHoverChange?: (id: string | null) => void
   className?: string
 }) {
   const resolved = isCommentResolved(comment)
@@ -520,25 +629,23 @@ function EditableComment({
     .join(' ')
 
   return (
-    <div className={threadClass}>
+    <div
+      className={threadClass}
+      onMouseEnter={() => onHoverChange?.(comment.id)}
+      onMouseLeave={() => onHoverChange?.(null)}
+    >
       <div className="comment-view" aria-hidden={editing || undefined}>
         <div className="comment-header">
-          <span className="comment-header-label" title={formatCommitTime(comment.createdAt)}>
-            {formatCommentHeaderWhen(comment.createdAt)}
-          </span>
+          {resolved && !expanded ? (
+            <span className="comment-header-label comment-resolved-heading">Resolved</span>
+          ) : (
+            <span className="comment-header-label" title={formatCommitTime(comment.createdAt)}>
+              {formatCommentHeaderWhen(comment.createdAt)}
+            </span>
+          )}
           <div className="comment-view-actions">
             {resolved ? (
-              <button
-                type="button"
-                className="comment-icon-btn comment-expand-btn"
-                title={expanded ? 'Collapse resolved comment' : 'Expand resolved comment'}
-                aria-label={expanded ? 'Collapse resolved comment' : 'Expand resolved comment'}
-                aria-expanded={expanded}
-                disabled={busy || editing}
-                onClick={() => setExpanded((prev) => !prev)}
-              >
-                <span className={`comment-chevron${expanded ? ' is-open' : ''}`} aria-hidden="true" />
-              </button>
+              <span className="comment-icon-slot" aria-hidden="true" />
             ) : (
               <button
                 type="button"
@@ -559,9 +666,26 @@ function EditableComment({
               disabled={busy || editing}
               onClick={() => void onResolve(comment.id, !resolved)}
             >
-              <CheckIcon />
+              {resolved ? <UndoIcon /> : <CheckIcon />}
             </button>
-            {!resolved ? (
+            {resolved ? (
+              <button
+                type="button"
+                className="comment-icon-btn comment-expand-btn"
+                title={expanded ? 'Collapse resolved comment' : 'Expand resolved comment'}
+                aria-label={expanded ? 'Collapse resolved comment' : 'Expand resolved comment'}
+                aria-expanded={expanded}
+                disabled={busy || editing}
+                onClick={() => setExpanded((prev) => !prev)}
+              >
+                <span
+                  className={`comment-chevron-wrap${expanded ? ' is-open' : ''}`}
+                  aria-hidden="true"
+                >
+                  <span className="comment-chevron" />
+                </span>
+              </button>
+            ) : (
               <button
                 type="button"
                 className="comment-icon-btn comment-delete-btn"
@@ -575,7 +699,7 @@ function EditableComment({
               >
                 <TrashIcon />
               </button>
-            ) : null}
+            )}
           </div>
         </div>
         {resolved && !expanded ? (
@@ -585,7 +709,6 @@ function EditableComment({
             disabled={busy}
             onClick={() => setExpanded(true)}
           >
-            <span className="comment-resolved-label">Resolved</span>
             <span className="comment-resolved-preview">{commentPreview(comment.body)}</span>
           </button>
         ) : (
@@ -794,7 +917,12 @@ function FileDiffSection({
   fileComments: FileComment[]
   draftLine: {
     path: string
+    /** First line of the selection (inclusive). */
+    startLine: number
+    /** Last line of the selection (inclusive). */
     line: number
+    /** Display index of the last selected row (compose box anchors here). */
+    anchorIdx: number
     lineType: LineType
     snippet: string
   } | null
@@ -804,7 +932,9 @@ function FileDiffSection({
   setBody: (value: string) => void
   onStartLineComment: (args: {
     path: string
+    startLine: number
     line: number
+    anchorIdx: number
     lineType: LineType
     snippet: string
   }) => void
@@ -824,6 +954,156 @@ function FileDiffSection({
   }, [file, showWhitespace])
   const highlighted: LineTokens[] | null = useHighlightedDiff(displayFile)
   const [expanded, setExpanded] = useState(true)
+  const [hoveredCommentId, setHoveredCommentId] = useState<string | null>(null)
+  const [lineSelect, setLineSelect] = useState<{
+    path: string
+    anchorIdx: number
+    endIdx: number
+    lineType: LineType
+  } | null>(null)
+  const lineSelectRef = useRef<typeof lineSelect>(null)
+  const displayLinesRef = useRef(displayFile.lines)
+  displayLinesRef.current = displayFile.lines
+  const onStartLineCommentRef = useRef(onStartLineComment)
+  onStartLineCommentRef.current = onStartLineComment
+
+  function commitLineSelect() {
+    const current = lineSelectRef.current
+    if (!current) return
+    const lines = displayLinesRef.current
+    const lo = Math.min(current.anchorIdx, current.endIdx)
+    const hi = Math.max(current.anchorIdx, current.endIdx)
+    const startLine = lines[lo]
+    const endLineRow = lines[hi]
+    if (
+      !startLine ||
+      !endLineRow ||
+      !isCommentableLine(startLine) ||
+      !isCommentableLine(endLineRow)
+    ) {
+      lineSelectRef.current = null
+      setLineSelect(null)
+      return
+    }
+    const startNo = lineNumberFor(startLine)
+    const endNo = lineNumberFor(endLineRow)
+    if (startNo === null || endNo === null) {
+      lineSelectRef.current = null
+      setLineSelect(null)
+      return
+    }
+    onStartLineCommentRef.current({
+      path: current.path,
+      startLine: Math.min(startNo, endNo),
+      line: Math.max(startNo, endNo),
+      anchorIdx: hi,
+      lineType: current.lineType,
+      snippet: rangeSnippet(lines, lo, hi),
+    })
+    lineSelectRef.current = null
+    setLineSelect(null)
+  }
+
+  function extendLineSelect(targetIdx: number) {
+    const prev = lineSelectRef.current
+    if (!prev || prev.path !== file.path) return
+    const endIdx = contiguousRangeEnd(
+      displayLinesRef.current,
+      prev.anchorIdx,
+      targetIdx,
+      prev.lineType,
+    )
+    if (endIdx === prev.endIdx) return
+    const next = { ...prev, endIdx }
+    lineSelectRef.current = next
+    setLineSelect(next)
+  }
+
+  function beginLineSelect(
+    idx: number,
+    lineType: LineType,
+    pointerId: number,
+    target: HTMLElement,
+  ) {
+    const initial = {
+      path: file.path,
+      anchorIdx: idx,
+      endIdx: idx,
+      lineType,
+    }
+    lineSelectRef.current = initial
+    setLineSelect(initial)
+    onClearDrafts()
+
+    function onPointerMove(e: PointerEvent) {
+      const el = document.elementFromPoint(e.clientX, e.clientY)
+      const lineEl = el?.closest?.('[data-line-idx]') as HTMLElement | null
+      if (!lineEl) return
+      const block = lineEl.closest('.diff-file') as HTMLElement | null
+      if (!block || block.getAttribute('data-file-path') !== file.path) return
+      const nextIdx = Number(lineEl.dataset.lineIdx)
+      if (!Number.isFinite(nextIdx)) return
+      extendLineSelect(nextIdx)
+    }
+
+    function cleanup() {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointercancel', onPointerCancel)
+      window.removeEventListener('keydown', onKeyDown)
+      try {
+        target.releasePointerCapture(pointerId)
+      } catch {
+        // already released
+      }
+    }
+
+    function onPointerUp() {
+      cleanup()
+      commitLineSelect()
+    }
+
+    function onPointerCancel() {
+      cleanup()
+      lineSelectRef.current = null
+      setLineSelect(null)
+    }
+
+    function onKeyDown(e: globalThis.KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      cleanup()
+      lineSelectRef.current = null
+      setLineSelect(null)
+    }
+
+    try {
+      target.setPointerCapture(pointerId)
+    } catch {
+      // capture optional; window listeners still work
+    }
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerCancel)
+    window.addEventListener('keydown', onKeyDown)
+  }
+
+  const selectLo =
+    lineSelect && lineSelect.path === file.path
+      ? Math.min(lineSelect.anchorIdx, lineSelect.endIdx)
+      : null
+  const selectHi =
+    lineSelect && lineSelect.path === file.path
+      ? Math.max(lineSelect.anchorIdx, lineSelect.endIdx)
+      : null
+  const multiLineDraft =
+    draftLine !== null && draftLine.path === file.path && draftLine.startLine !== draftLine.line
+  const hoveredComment =
+    hoveredCommentId === null
+      ? null
+      : (lineComments.find((c) => c.id === hoveredCommentId) ?? null)
+  const hoveredDisplayRange = hoveredComment
+    ? commentDisplayRange(hoveredComment, file.path, displayFile.lines)
+    : null
 
   return (
     <section
@@ -932,7 +1212,7 @@ function FileDiffSection({
               </div>
             </div>
           ) : null}
-          <div className="unified-diff">
+          <div className={`unified-diff${lineSelect ? ' is-selecting-lines' : ''}`}>
             <div className="unified-diff-content">
               {displayFile.lines.map((line, idx) => {
                 if (line.type === 'meta') {
@@ -946,26 +1226,48 @@ function FileDiffSection({
                 }
 
                 const lineNo = lineNumberFor(line)
-                const related = lineComments.filter((c) => matchesLineComment(c, file.path, line))
+                const related = lineComments.filter((c) =>
+                  isCommentAnchorRow(c, file.path, displayFile.lines, idx),
+                )
                 const canComment = lineNo !== null
+                const inDragSelect =
+                  selectLo !== null && selectHi !== null && idx >= selectLo && idx <= selectHi
+                const inDraftRange =
+                  draftLine !== null &&
+                  draftLine.path === file.path &&
+                  draftLine.lineType === line.type &&
+                  lineNo !== null &&
+                  lineNo >= draftLine.startLine &&
+                  lineNo <= draftLine.line
+                const inHoverRange =
+                  hoveredDisplayRange !== null &&
+                  idx >= hoveredDisplayRange.lo &&
+                  idx <= hoveredDisplayRange.hi
+                const rangeHighlight = inDragSelect || inDraftRange
+                const showDraftCompose =
+                  draftLine !== null &&
+                  draftLine.path === file.path &&
+                  idx === draftLine.anchorIdx
 
                 return (
                   <div key={idx} className="diff-line-block">
-                    <div className={`diff-line ${line.type}`}>
+                    <div
+                      className={`diff-line ${line.type}${rangeHighlight ? ' is-line-range' : ''}${
+                        inDragSelect || inDraftRange ? ' is-line-selecting' : ''
+                      }${inHoverRange ? ' is-line-hover' : ''}`}
+                    >
                       <span className="gutter gutter-old">{line.oldLine ?? ''}</span>
                       <span className="gutter gutter-new">{line.newLine ?? ''}</span>
                       <button
                         type="button"
                         className="line-body"
                         disabled={!canComment}
-                        onClick={() => {
-                          if (lineNo === null || line.type === 'meta') return
-                          onStartLineComment({
-                            path: file.path,
-                            line: lineNo,
-                            lineType: line.type,
-                            snippet: line.content,
-                          })
+                        data-line-idx={idx}
+                        onPointerDown={(e) => {
+                          if (e.button !== 0) return
+                          if (lineNo === null || !isCommentableLine(line)) return
+                          e.preventDefault()
+                          beginLineSelect(idx, line.type, e.pointerId, e.currentTarget)
                         }}
                       >
                         <LineCode content={line.content} tokens={highlighted?.[idx]} />
@@ -979,19 +1281,21 @@ function FileDiffSection({
                         onSave={onEdit}
                         onResolve={onResolve}
                         onDelete={onDelete}
+                        onHoverChange={setHoveredCommentId}
                         className="inline"
                       />
                     ))}
-                    {draftLine &&
-                    draftLine.path === file.path &&
-                    draftLine.line === lineNo &&
-                    draftLine.lineType === line.type ? (
+                    {showDraftCompose ? (
                       <div className="comment-compose inline">
                         <div className="compose-panel">
                           <textarea
                             value={body}
                             onChange={(e) => setBody(e.target.value)}
-                            placeholder="Comment on this line"
+                            placeholder={
+                              multiLineDraft
+                                ? `Comment on lines ${draftLine.startLine}–${draftLine.line}`
+                                : 'Comment on this line'
+                            }
                             rows={3}
                             autoFocus
                             onKeyDown={(e) => {
@@ -1093,7 +1397,9 @@ export function CommitReview({
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => new Set())
   const [draftLine, setDraftLine] = useState<{
     path: string
+    startLine: number
     line: number
+    anchorIdx: number
     lineType: LineType
     snippet: string
   } | null>(null)
@@ -1360,6 +1666,13 @@ export function CommitReview({
         line: draftLine.line,
         lineType: draftLine.lineType,
         body: body.trim(),
+      }
+      if (draftLine.startLine !== draftLine.line) {
+        payload.startLine = draftLine.startLine
+      } else if (draftLine.snippet.includes('\n')) {
+        // Multi-line snippet must always carry an explicit range start.
+        const extra = draftLine.snippet.split('\n').length - 1
+        payload.startLine = Math.max(1, draftLine.line - extra)
       }
       if (draftLine.snippet.trim() !== '') {
         payload.snippet = draftLine.snippet
