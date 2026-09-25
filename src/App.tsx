@@ -45,6 +45,25 @@ function configIsReady(
   return Boolean(config?.baseBranch && config.reviewBranch)
 }
 
+/** True when the view URL's repo segment refers to `repoPath`. */
+function viewUrlMatchesRepo(
+  url: { repoName: string | null },
+  repoPath: string,
+): boolean {
+  if (!url.repoName) return false
+  if (url.repoName === repoPath) return true
+  const base = repoPath.replace(/\/+$/, '').split('/').pop()
+  return Boolean(base && url.repoName === base)
+}
+
+function metaHasBranch(meta: MetaResponse, name: string): boolean {
+  const trimmed = name.trim()
+  if (!trimmed) return false
+  const { local, remote } = meta.branches
+  if (local.includes(trimmed) || remote.includes(trimmed)) return true
+  return remote.some((r) => r === `origin/${trimmed}` || r.endsWith(`/${trimmed}`))
+}
+
 function withBranch(branches: string[], extra: string | null | undefined): string[] {
   if (!extra) return branches
   if (branches.includes(extra)) return branches
@@ -206,6 +225,10 @@ export default function App() {
       setActiveRepoPath(nextRepo)
       setRepoPath(nextRepo)
       hydrated.current = false
+      // Cancel in-flight config saves and drop the previous repo's branches so
+      // we never PUT a compare branch that does not exist in the new repo.
+      configSaveGen.current += 1
+      baseLockedRef.current = false
       setError(null)
       setCommits([])
       setBranchStats(null)
@@ -213,10 +236,20 @@ export default function App() {
       setComments([])
       setMessageEdits({})
       setSelectedSha(null)
+      setReviewDraft(REVIEW_BRANCH_PLACEHOLDER)
+      setBaseDraft('')
+
       const m = await fetchMeta()
       setMeta(m)
       const url = parseViewUrl()
-      if (url.reviewBranch && url.baseBranch) {
+      const urlForThisRepo = viewUrlMatchesRepo(url, nextRepo)
+      const urlBranchesOk =
+        urlForThisRepo &&
+        Boolean(url.reviewBranch && url.baseBranch) &&
+        metaHasBranch(m, url.reviewBranch!) &&
+        metaHasBranch(m, url.baseBranch!)
+
+      if (urlBranchesOk && url.reviewBranch && url.baseBranch) {
         setReviewDraft(url.reviewBranch)
         setBaseDraft(url.baseBranch)
         baseLockedRef.current = true
@@ -229,15 +262,20 @@ export default function App() {
         ) {
           await loadReviewData()
         }
-      } else if (configIsReady(m.config)) {
+      } else if (configIsReady(m.config) && metaHasBranch(m, m.config.reviewBranch)) {
         setReviewDraft(m.config.reviewBranch)
-        setBaseDraft(m.config.baseBranch)
-        baseLockedRef.current = true
-        await loadReviewData()
+        if (metaHasBranch(m, m.config.baseBranch)) {
+          setBaseDraft(m.config.baseBranch)
+          baseLockedRef.current = true
+          await loadReviewData()
+        } else {
+          // Saved review branch is fine; re-pick compare for this repo.
+          setBaseDraft(m.suggestedBase?.baseBranch ?? m.defaultBaseBranch)
+          baseLockedRef.current = false
+        }
       } else {
         setReviewDraft(REVIEW_BRANCH_PLACEHOLDER)
-        const suggested = m.suggestedBase?.baseBranch ?? m.defaultBaseBranch
-        setBaseDraft(suggested)
+        setBaseDraft(m.suggestedBase?.baseBranch ?? m.defaultBaseBranch)
         baseLockedRef.current = false
       }
       hydrated.current = true
