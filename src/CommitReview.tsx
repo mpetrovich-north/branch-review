@@ -33,6 +33,11 @@ import {
 } from './icons'
 import { useHighlightedDiff, type LineTokens } from './highlight'
 import { countFileDiffStats, DiffStat, sumDiffStats } from './DiffStat'
+import {
+  hideWhitespaceOnlyChanges,
+  readStoredShowWhitespace,
+  writeStoredShowWhitespace,
+} from './whitespaceDiff'
 import type { ThemedToken } from 'shiki'
 
 function isSaveShortcut(e: { key: string; metaKey: boolean; ctrlKey: boolean }): boolean {
@@ -690,6 +695,8 @@ function FileDiffSection({
   onEdit,
   onResolve,
   onDelete,
+  showWhitespace,
+  onToggleShowWhitespace,
 }: {
   file: DiffFile
   lineComments: LineComment[]
@@ -717,8 +724,14 @@ function FileDiffSection({
   onEdit: (id: string, body: string) => Promise<void>
   onResolve: (id: string, resolved: boolean) => Promise<void>
   onDelete: (id: string) => Promise<void>
+  showWhitespace: boolean
+  onToggleShowWhitespace: () => void
 }) {
-  const highlighted: LineTokens[] | null = useHighlightedDiff(file)
+  const displayFile = useMemo(() => {
+    if (showWhitespace) return file
+    return { ...file, lines: hideWhitespaceOnlyChanges(file.lines) }
+  }, [file, showWhitespace])
+  const highlighted: LineTokens[] | null = useHighlightedDiff(displayFile)
   const [expanded, setExpanded] = useState(true)
 
   return (
@@ -759,7 +772,7 @@ function FileDiffSection({
           <strong>{file.path}</strong>
         </div>
         <div className="diff-file-actions">
-          <DiffStat {...countFileDiffStats(file)} />
+          <DiffStat {...countFileDiffStats(displayFile)} />
           <button
             type="button"
             className="comment-bubble"
@@ -769,6 +782,25 @@ function FileDiffSection({
           >
             <CommentBubbleIcon />
             Comment
+          </button>
+          <button
+            type="button"
+            className={`reviewed-toggle${showWhitespace ? ' is-reviewed' : ''}`}
+            title={
+              showWhitespace
+                ? 'Hide whitespace-only changes'
+                : 'Show whitespace-only changes'
+            }
+            aria-label={
+              showWhitespace
+                ? 'Hide whitespace-only changes'
+                : 'Show whitespace-only changes'
+            }
+            aria-pressed={showWhitespace}
+            onClick={onToggleShowWhitespace}
+          >
+            <CheckboxIcon checked={showWhitespace} />
+            Whitespace
           </button>
         </div>
       </div>
@@ -811,7 +843,7 @@ function FileDiffSection({
           ) : null}
           <div className="unified-diff">
             <div className="unified-diff-content">
-              {file.lines.map((line, idx) => {
+              {displayFile.lines.map((line, idx) => {
                 if (line.type === 'meta') {
                   return (
                     <div key={idx} className="diff-line meta">
@@ -987,8 +1019,17 @@ export function CommitReview({
   const [fileListWidth, setFileListWidth] = useState(0)
   const [fileListCollapsed, setFileListCollapsed] = useState(false)
   const [fileListScrollHidden, setFileListScrollHidden] = useState(false)
+  const [showWhitespace, setShowWhitespace] = useState(readStoredShowWhitespace)
   const fileListCollapsedRef = useRef(fileListCollapsed)
   fileListCollapsedRef.current = fileListCollapsed
+
+  function toggleShowWhitespace() {
+    setShowWhitespace((prev) => {
+      const next = !prev
+      writeStoredShowWhitespace(next)
+      return next
+    })
+  }
 
   function toggleFileListCollapsed() {
     setFileListCollapsed((prev) => {
@@ -1526,6 +1567,8 @@ export function CommitReview({
                 onEdit={onEdit}
                 onResolve={onResolve}
                 onDelete={onDelete}
+                showWhitespace={showWhitespace}
+                onToggleShowWhitespace={toggleShowWhitespace}
               />
             ))
           )}
