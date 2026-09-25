@@ -5,7 +5,16 @@ export type LineComment = {
   kind: 'line'
   commitSha: string
   path: string
+  /**
+   * Last line of the range (inclusive). The comment thread is anchored under
+   * this line. For a single-line comment, this is the only line.
+   */
   line: number
+  /**
+   * First line of a multi-line range (inclusive). Omit when the comment covers
+   * a single line. When set, must be <= `line` and share the same `lineType`.
+   */
+  startLine?: number
   lineType: LineType
   snippet?: string
   body: string

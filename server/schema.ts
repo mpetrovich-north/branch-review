@@ -8,18 +8,26 @@ const commentResolvedFields = {
   resolvedAt: z.string().datetime().optional(),
 }
 
-export const lineCommentSchema = z.object({
-  id: z.string().min(1),
-  kind: z.literal('line'),
-  commitSha: z.string().min(1),
-  path: z.string().min(1),
-  line: z.number().int().positive(),
-  lineType: lineTypeSchema,
-  snippet: z.string().optional(),
-  body: z.string().min(1),
-  createdAt: z.string().datetime(),
-  ...commentResolvedFields,
-})
+export const lineCommentSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: z.literal('line'),
+    commitSha: z.string().min(1),
+    path: z.string().min(1),
+    /** Last line of the range (inclusive); comment thread anchors here. */
+    line: z.number().int().positive(),
+    /** First line of a multi-line range; omit for a single-line comment. */
+    startLine: z.number().int().positive().optional(),
+    lineType: lineTypeSchema,
+    snippet: z.string().optional(),
+    body: z.string().min(1),
+    createdAt: z.string().datetime(),
+    ...commentResolvedFields,
+  })
+  .refine((value) => value.startLine === undefined || value.startLine <= value.line, {
+    message: 'startLine must be <= line',
+    path: ['startLine'],
+  })
 
 export const fileCommentSchema = z.object({
   id: z.string().min(1),
@@ -80,15 +88,21 @@ export const storedConfigSchema = z.object({
   reviewBranch: z.string().min(1).optional(),
 })
 
-export const createLineCommentSchema = z.object({
-  kind: z.literal('line'),
-  commitSha: z.string().min(1),
-  path: z.string().min(1),
-  line: z.number().int().positive(),
-  lineType: lineTypeSchema,
-  snippet: z.string().optional(),
-  body: z.string().min(1),
-})
+export const createLineCommentSchema = z
+  .object({
+    kind: z.literal('line'),
+    commitSha: z.string().min(1),
+    path: z.string().min(1),
+    line: z.number().int().positive(),
+    startLine: z.number().int().positive().optional(),
+    lineType: lineTypeSchema,
+    snippet: z.string().optional(),
+    body: z.string().min(1),
+  })
+  .refine((value) => value.startLine === undefined || value.startLine <= value.line, {
+    message: 'startLine must be <= line',
+    path: ['startLine'],
+  })
 
 export const createFileCommentSchema = z.object({
   kind: z.literal('file'),

@@ -33,9 +33,10 @@
   "kind": "line",
   "commitSha": "abc1234def5678...",
   "path": "src/foo.ts",
-  "line": 42,
+  "startLine": 42,
+  "line": 45,
   "lineType": "added",
-  "snippet": "  return items.reduce(...)",
+  "snippet": "  return items.reduce(...)\n    .filter(Boolean)\n    .map(toRow)",
   "body": "Prefer a plain for-loop here.",
   "createdAt": "2026-09-17T20:01:00.000Z"
 }
@@ -43,9 +44,11 @@
 
 `lineType` is `added` | `removed` | `unchanged`.
 
-`snippet` is included when the line text is non-empty after trim; omitted for blank lines.
+`line` is the last line of the range (inclusive). The comment thread is shown under that line. Optional `startLine` is the first line (inclusive). Omit `startLine` for a single-line comment. When set, `startLine` must be `<= line`, and every line in the range shares the same `lineType` side.
 
-| `lineType` | `line` refers to |
+`snippet` is included when the covered line text is non-empty after trim; omitted for blank lines. For a multi-line range, `snippet` is the joined line texts (newline-separated).
+
+| `lineType` | `line` / `startLine` refer to |
 | --- | --- |
 | `added` | New file (post-image) |
 | `unchanged` | New file (post-image) |

@@ -1,6 +1,6 @@
 # branch-review
 
-Local GitHub-style UI to review commits on a branch one at a time and leave comments on a commit, a file, or a diff line. Comments are stored as JSON under `.branch-review/` in the target repository.
+Local GitHub-style UI to review commits on a branch one at a time and leave comments on a commit, a file, a diff line, or a contiguous line range. Comments are stored as JSON under `.branch-review/` in the target repository.
 
 This app does not apply fixes. An agent skill (separate) can read `.branch-review/` and change code.
 
@@ -39,7 +39,7 @@ npm run dev
 
 1. Choose **Repo**, **review branch**, and **base branch** in the UI. Branch choices are saved to that repo’s `.branch-review/config.json`. The app does not check out the review branch.
 2. Review commits on the review branch that are not on the base branch.
-3. Comment on a commit, a file, or a diff line.
+3. Comment on a commit, a file, a diff line, or a contiguous range of lines (click and drag).
 4. Comments are written to `.branch-review/comments/<branch-slug>.json` for the **review** branch.
 5. Resolve a comment in the UI when it is done (keeps it on disk, collapsed). Hard-delete only for mistakes. Agents mark comments resolved after apply.
 

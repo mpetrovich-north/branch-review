@@ -84,6 +84,35 @@ function emptyCommentsFile(branch: string, baseBranch: string): CommentsFile {
   }
 }
 
+/**
+ * Brief early draft stored `line` as the first line and `endLine` as the last.
+ * Canonical form is GitHub-style: `line` = last (anchor), optional `startLine` = first.
+ */
+function migrateLegacyLineRange(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw
+  const file = raw as { comments?: unknown[] }
+  if (!Array.isArray(file.comments)) return raw
+  return {
+    ...file,
+    comments: file.comments.map((comment) => {
+      if (!comment || typeof comment !== 'object') return comment
+      const c = comment as Record<string, unknown>
+      if (c.kind !== 'line') return comment
+      if (typeof c.endLine !== 'number') return comment
+      const endLine = c.endLine
+      const { endLine: _drop, ...rest } = c
+      if (typeof c.line === 'number' && c.startLine === undefined) {
+        return {
+          ...rest,
+          ...(c.line !== endLine ? { startLine: c.line } : {}),
+          line: endLine,
+        }
+      }
+      return rest
+    }),
+  }
+}
+
 export async function readComments(
   repoPath: string,
   branch: string,
@@ -92,7 +121,7 @@ export async function readComments(
   await ensureReviewDir(repoPath)
   try {
     const raw = await readFile(commentsPath(repoPath, branch), 'utf8')
-    return commentsFileSchema.parse(JSON.parse(raw))
+    return commentsFileSchema.parse(migrateLegacyLineRange(JSON.parse(raw)))
   } catch {
     return emptyCommentsFile(branch, baseBranch)
   }
@@ -138,6 +167,9 @@ export async function addComment(
       lineType: data.lineType,
       body: data.body,
       createdAt: new Date().toISOString(),
+    }
+    if (data.startLine !== undefined && data.startLine !== data.line) {
+      comment.startLine = data.startLine
     }
     const snippet = normalizeSnippet(data.snippet)
     if (snippet !== undefined) {
