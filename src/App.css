@@ -1167,6 +1167,11 @@ pre,
   padding-top: 0.15rem;
 }
 
+/* Clear the header action row when meta is hidden; leave description tight. */
+.commit-message-panel.is-stuck .commit-message-comments {
+  margin-top: 0.45rem;
+}
+
 /* Description left; comment on the right, capped so it does not span the row. */
 .commit-message-content:has(.commit-message-comments) {
   display: grid;
