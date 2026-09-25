@@ -174,6 +174,8 @@ export default function App() {
   const hydrated = useRef(false)
   const configSaveGen = useRef(0)
   const preferShaRef = useRef<string | null>(parseViewUrl().commitSha)
+  /** When true, do not overwrite baseDraft from suggest-base (saved or user-picked). */
+  const baseLockedRef = useRef(false)
 
   function setCommitsCollapsed(collapsed: boolean) {
     setCommitsCollapsedState(collapsed)
@@ -216,6 +218,7 @@ export default function App() {
       if (url.reviewBranch && url.baseBranch) {
         setReviewDraft(url.reviewBranch)
         setBaseDraft(url.baseBranch)
+        baseLockedRef.current = true
         preferShaRef.current = url.commitSha
         setSeedFilePath(url.filePath)
         setActiveFilePath(url.filePath)
@@ -228,11 +231,13 @@ export default function App() {
       } else if (configIsReady(m.config)) {
         setReviewDraft(m.config.reviewBranch)
         setBaseDraft(m.config.baseBranch)
+        baseLockedRef.current = true
         await loadReviewData()
       } else {
         setReviewDraft(REVIEW_BRANCH_PLACEHOLDER)
         const suggested = m.suggestedBase?.baseBranch ?? m.defaultBaseBranch
         setBaseDraft(suggested)
+        baseLockedRef.current = false
       }
       hydrated.current = true
     },
@@ -271,11 +276,12 @@ export default function App() {
     if (!hydrated.current || !reviewDraft.trim() || !getActiveRepoPath()) return
     let cancelled = false
     const handle = window.setTimeout(() => {
-      const savedReview = meta?.config?.reviewBranch
-      fetchSuggestedBase(reviewDraft.trim())
+      const review = reviewDraft.trim()
+      fetchSuggestedBase(review)
         .then((res) => {
           if (cancelled) return
-          if (savedReview === reviewDraft.trim()) return
+          // Keep a saved or manually chosen base; unlock happens when review changes.
+          if (baseLockedRef.current) return
           if (res.suggestedBase) {
             setBaseDraft(res.suggestedBase.baseBranch)
           }
@@ -288,7 +294,7 @@ export default function App() {
       cancelled = true
       window.clearTimeout(handle)
     }
-  }, [reviewDraft, meta?.config?.reviewBranch, repoPath])
+  }, [reviewDraft, repoPath])
 
   useEffect(() => {
     if (!hydrated.current || !meta || !getActiveRepoPath()) return
@@ -578,7 +584,10 @@ export default function App() {
         <select
           id="review-branch"
           value={reviewDraft}
-          onChange={(e) => setReviewDraft(e.target.value)}
+          onChange={(e) => {
+            baseLockedRef.current = false
+            setReviewDraft(e.target.value)
+          }}
           disabled={!meta}
         >
           {reviewDraft === REVIEW_BRANCH_PLACEHOLDER ? (
@@ -594,7 +603,10 @@ export default function App() {
         <select
           id="base-branch"
           value={baseDraft}
-          onChange={(e) => setBaseDraft(e.target.value)}
+          onChange={(e) => {
+            baseLockedRef.current = true
+            setBaseDraft(e.target.value)
+          }}
           disabled={!meta}
         >
           <BranchOptionGroups local={baseOptions.local} remote={baseOptions.remote} />
