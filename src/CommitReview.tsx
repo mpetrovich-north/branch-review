@@ -4,9 +4,12 @@ import {
   useMemo,
   useRef,
   useState,
+  type ClipboardEvent,
   type CSSProperties,
   type FocusEvent,
+  type KeyboardEvent,
   type MouseEvent,
+  type RefObject,
 } from 'react'
 import type {
   Comment,
@@ -176,6 +179,7 @@ function EditableCommitText({
   const isEdited = edited !== undefined
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(display)
+  const editorRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     if (!editing) setDraft(display)
@@ -185,8 +189,32 @@ function EditableCommitText({
     setEditing(false)
   }, [original, edited])
 
+  useLayoutEffect(() => {
+    if (!editing) return
+    const el = editorRef.current
+    if (!el) return
+    el.textContent = display
+    el.focus()
+    const selection = window.getSelection()
+    if (!selection) return
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    // Seed once when editing starts; `display` is from that render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing])
+
+  function readEditorValue(): string {
+    const el = editorRef.current
+    if (!el) return draft
+    return (el.innerText ?? el.textContent ?? '').replace(/\u00a0/g, ' ')
+  }
+
   async function save() {
-    const next = kind === 'subject' ? draft.trim() : draft.replace(/\n+$/, '')
+    const raw = readEditorValue()
+    const next = kind === 'subject' ? raw.trim() : raw.replace(/\n+$/, '')
     if (kind === 'subject' && !next) return
     if (next === original) {
       if (isEdited) await onReset()
@@ -201,17 +229,58 @@ function EditableCommitText({
     setEditing(false)
   }
 
+  function cancel() {
+    setEditing(false)
+    setDraft(display)
+  }
+
   function beginEdit() {
     if (busy) return
     setDraft(display)
     setEditing(true)
   }
 
-  function onEditorKeyDown(e: { key: string; metaKey: boolean; ctrlKey: boolean; preventDefault: () => void }) {
+  function onEditorInput() {
+    setDraft(readEditorValue())
+  }
+
+  function onEditorKeyDown(e: KeyboardEvent<HTMLElement>) {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      cancel()
+      return
+    }
+    if (kind === 'subject' && e.key === 'Enter') {
+      e.preventDefault()
+      if (!busy) void save()
+      return
+    }
+    if (kind === 'body' && e.key === 'Enter') {
+      e.preventDefault()
+      document.execCommand('insertText', false, '\n')
+      setDraft(readEditorValue())
+      return
+    }
     if (!isSaveShortcut(e)) return
     e.preventDefault()
     if (!busy) void save()
   }
+
+  function onEditorPaste(e: ClipboardEvent<HTMLElement>) {
+    e.preventDefault()
+    let text = e.clipboardData.getData('text/plain')
+    if (kind === 'subject') text = text.replace(/\s+/g, ' ')
+    document.execCommand('insertText', false, text)
+    setDraft(readEditorValue())
+  }
+
+  const contentClass = [
+    'commit-display-content',
+    isEdited ? 'is-edited' : '',
+    editing ? 'is-editing' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div
@@ -221,7 +290,6 @@ function EditableCommitText({
         className="commit-display-main"
         role={editing ? undefined : 'button'}
         tabIndex={editing ? undefined : 0}
-        aria-hidden={editing || undefined}
         onClick={
           editing
             ? undefined
@@ -241,65 +309,57 @@ function EditableCommitText({
               }
         }
       >
-        <div className={`commit-display-content${isEdited ? ' is-edited' : ''}`}>
+        <div className={contentClass}>
           {!editing ? (
-            <button
-              type="button"
-              className="commit-edit-trigger"
-              title={kind === 'subject' ? 'Click to edit subject' : 'Click to edit description'}
-              aria-label={kind === 'subject' ? 'Click to edit subject' : 'Click to edit description'}
-              disabled={busy}
-              onClick={beginEdit}
-            >
-              Click to edit
-            </button>
+            <span
+              className={`commit-edit-chip${isEdited ? ' is-edited' : ''}`}
+              title={isEdited ? `Original: ${original || '(empty)'}` : undefined}
+              aria-hidden={isEdited ? undefined : true}
+            />
           ) : null}
           {kind === 'subject' ? (
-            <h2>{display}</h2>
+            <h2
+              ref={editorRef as RefObject<HTMLHeadingElement | null>}
+              contentEditable={editing}
+              suppressContentEditableWarning
+              spellCheck={editing}
+              aria-label="Commit subject"
+              aria-multiline={false}
+              role={editing ? 'textbox' : undefined}
+              onInput={editing ? onEditorInput : undefined}
+              onKeyDown={editing ? onEditorKeyDown : undefined}
+              onPaste={editing ? onEditorPaste : undefined}
+            >
+              {editing ? null : display}
+            </h2>
+          ) : editing ? (
+            <pre
+              ref={editorRef as RefObject<HTMLPreElement | null>}
+              className="commit-body"
+              contentEditable
+              suppressContentEditableWarning
+              spellCheck
+              aria-label="Commit description"
+              aria-multiline
+              role="textbox"
+              onInput={onEditorInput}
+              onKeyDown={onEditorKeyDown}
+              onPaste={onEditorPaste}
+            />
           ) : display ? (
             <CommitBodyDisplay body={display} />
           ) : (
             <p className="muted commit-body-empty">No message body</p>
           )}
         </div>
-        {isEdited ? (
-          <span className="commit-edited-label" title={`Original: ${original || '(empty)'}`}>
-            Edited
-          </span>
-        ) : null}
       </div>
       {editing ? (
-        <div className={`commit-edit commit-edit-overlay commit-edit-${kind}`}>
-          {kind === 'subject' ? (
-            <input
-              className="commit-edit-input"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              disabled={busy}
-              autoFocus
-              aria-label="Commit subject"
-              onKeyDown={onEditorKeyDown}
-            />
-          ) : (
-            <textarea
-              className="commit-edit-input commit-edit-textarea"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              disabled={busy}
-              rows={Math.min(12, Math.max(3, draft.split('\n').length + 1))}
-              autoFocus
-              aria-label="Commit description"
-              onKeyDown={onEditorKeyDown}
-            />
-          )}
+        <div className="commit-edit-toolbar">
           <DraftActions
             busy={busy}
             saveDisabled={kind === 'subject' && !draft.trim()}
             onSave={() => void save()}
-            onCancel={() => {
-              setEditing(false)
-              setDraft(display)
-            }}
+            onCancel={cancel}
             onReset={
               isEdited
                 ? () => {
@@ -368,6 +428,26 @@ function formatCommitTime(iso: string): string {
     second: '2-digit',
     timeZoneName: 'short',
   })
+}
+
+/** Calendar-day label for comment headers. */
+function formatCommentHeaderWhen(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return 'Comment from unknown date'
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+  const startOfDay = new Date(date)
+  startOfDay.setHours(0, 0, 0, 0)
+  const days = Math.round((startOfToday.getTime() - startOfDay.getTime()) / 86_400_000)
+  if (days <= 0) return 'Commented today'
+  if (days === 1) return 'Commented yesterday'
+  if (days < 30) return `Commented ${days} days ago`
+  const absolute = date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+  return `Comment from ${absolute}`
 }
 
 function isCommentResolved(comment: Comment): boolean {
@@ -442,30 +522,62 @@ function EditableComment({
   return (
     <div className={threadClass}>
       <div className="comment-view" aria-hidden={editing || undefined}>
-        {resolved ? (
-          <button
-            type="button"
-            className="comment-icon-btn comment-expand-btn"
-            title={expanded ? 'Collapse resolved comment' : 'Expand resolved comment'}
-            aria-label={expanded ? 'Collapse resolved comment' : 'Expand resolved comment'}
-            aria-expanded={expanded}
-            disabled={busy || editing}
-            onClick={() => setExpanded((prev) => !prev)}
-          >
-            <span className={`comment-chevron${expanded ? ' is-open' : ''}`} aria-hidden="true" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="comment-icon-btn comment-edit-btn"
-            title="Edit comment"
-            aria-label="Edit comment"
-            disabled={busy || editing}
-            onClick={beginEdit}
-          >
-            <EditIcon />
-          </button>
-        )}
+        <div className="comment-header">
+          <span className="comment-header-label" title={formatCommitTime(comment.createdAt)}>
+            {formatCommentHeaderWhen(comment.createdAt)}
+          </span>
+          <div className="comment-view-actions">
+            {resolved ? (
+              <button
+                type="button"
+                className="comment-icon-btn comment-expand-btn"
+                title={expanded ? 'Collapse resolved comment' : 'Expand resolved comment'}
+                aria-label={expanded ? 'Collapse resolved comment' : 'Expand resolved comment'}
+                aria-expanded={expanded}
+                disabled={busy || editing}
+                onClick={() => setExpanded((prev) => !prev)}
+              >
+                <span className={`comment-chevron${expanded ? ' is-open' : ''}`} aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="comment-icon-btn comment-edit-btn"
+                title="Edit comment"
+                aria-label="Edit comment"
+                disabled={busy || editing}
+                onClick={beginEdit}
+              >
+                <EditIcon />
+              </button>
+            )}
+            <button
+              type="button"
+              className={`comment-icon-btn comment-resolve-btn${resolved ? ' is-resolved' : ''}`}
+              title={resolved ? 'Reopen comment' : 'Resolve comment'}
+              aria-label={resolved ? 'Reopen comment' : 'Resolve comment'}
+              disabled={busy || editing}
+              onClick={() => void onResolve(comment.id, !resolved)}
+            >
+              <CheckIcon />
+            </button>
+            {!resolved ? (
+              <button
+                type="button"
+                className="comment-icon-btn comment-delete-btn"
+                title="Delete comment"
+                aria-label="Delete comment"
+                disabled={busy || editing}
+                onClick={() => {
+                  if (!window.confirm('Delete this comment?')) return
+                  void onDelete(comment.id)
+                }}
+              >
+                <TrashIcon />
+              </button>
+            ) : null}
+          </div>
+        </div>
         {resolved && !expanded ? (
           <button
             type="button"
@@ -486,30 +598,6 @@ function EditableComment({
             {comment.body}
           </button>
         )}
-        <div className="comment-view-actions">
-          <button
-            type="button"
-            className={`comment-icon-btn comment-resolve-btn${resolved ? ' is-resolved' : ''}`}
-            title={resolved ? 'Reopen comment' : 'Resolve comment'}
-            aria-label={resolved ? 'Reopen comment' : 'Resolve comment'}
-            disabled={busy || editing}
-            onClick={() => void onResolve(comment.id, !resolved)}
-          >
-            <CheckIcon />
-          </button>
-          {!resolved ? (
-            <button
-              type="button"
-              className="comment-icon-btn comment-delete-btn"
-              title="Delete comment"
-              aria-label="Delete comment"
-              disabled={busy || editing}
-              onClick={() => void onDelete(comment.id)}
-            >
-              <TrashIcon />
-            </button>
-          ) : null}
-        </div>
       </div>
       {editing ? (
         <div className="compose-panel comment-edit-overlay">
@@ -531,7 +619,10 @@ function EditableComment({
               setEditing(false)
               setDraft(comment.body)
             }}
-            onDelete={() => void onDelete(comment.id)}
+            onDelete={() => {
+              if (!window.confirm('Delete this comment?')) return
+              void onDelete(comment.id)
+            }}
           />
         </div>
       ) : null}
@@ -1478,46 +1569,52 @@ export function CommitReview({
         </div>
 
         <div className="commit-message-content">
-          <EditableCommitText
-            kind="body"
-            original={commit.body}
-            edited={messageEdit?.body}
-            busy={busy}
-            onSave={(value) => saveMessageField('body', value)}
-            onReset={() => resetMessageField('body')}
-          />
-          {commitComments.map((c) => (
-            <EditableComment
-              key={c.id}
-              comment={c}
+          <div className="commit-message-prose">
+            <EditableCommitText
+              kind="body"
+              original={commit.body}
+              edited={messageEdit?.body}
               busy={busy}
-              onSave={onEdit}
-              onResolve={onResolve}
-              onDelete={onDelete}
+              onSave={(value) => saveMessageField('body', value)}
+              onReset={() => resetMessageField('body')}
             />
-          ))}
-          {draftCommit ? (
-            <div className="comment-compose">
-              <div className="compose-panel">
-                <textarea
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder="Comment on this commit"
-                  rows={3}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (!isSaveShortcut(e)) return
-                    e.preventDefault()
-                    if (!busy) void submitCommit()
-                  }}
-                />
-                <DraftActions
+          </div>
+          {commitComments.length > 0 || draftCommit ? (
+            <div className="commit-message-comments">
+              {commitComments.map((c) => (
+                <EditableComment
+                  key={c.id}
+                  comment={c}
                   busy={busy}
-                  saveDisabled={!body.trim()}
-                  onSave={() => void submitCommit()}
-                  onCancel={clearDrafts}
+                  onSave={onEdit}
+                  onResolve={onResolve}
+                  onDelete={onDelete}
                 />
-              </div>
+              ))}
+              {draftCommit ? (
+                <div className="comment-compose commit-level">
+                  <div className="compose-panel">
+                    <textarea
+                      value={body}
+                      onChange={(e) => setBody(e.target.value)}
+                      placeholder="Comment on this commit"
+                      rows={3}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (!isSaveShortcut(e)) return
+                        e.preventDefault()
+                        if (!busy) void submitCommit()
+                      }}
+                    />
+                    <DraftActions
+                      busy={busy}
+                      saveDisabled={!body.trim()}
+                      onSave={() => void submitCommit()}
+                      onCancel={clearDrafts}
+                    />
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
