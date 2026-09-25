@@ -37,18 +37,37 @@ function compareByOrder(a: FileTreeNode, b: FileTreeNode): number {
   return a.order - b.order
 }
 
+/**
+ * Merge chains of single-child directories into one node
+ * (e.g. code/ → lambda/ → lambda_layers/ → code/lambda/lambda_layers/).
+ * Skip the anonymous root (empty name).
+ */
+function compactDir(node: FileTreeDirNode): FileTreeDirNode {
+  if (!node.name) return node
+
+  let { name, path, children, order } = node
+  while (children.length === 1 && children[0]!.kind === 'dir') {
+    const only = children[0]!
+    name = `${name}/${only.name}`
+    path = only.path
+    children = only.children
+    order = Math.min(order, only.order)
+  }
+  return { kind: 'dir', name, path, children, order }
+}
+
 function finalize(dir: MutableDir): FileTreeDirNode {
   const children: FileTreeNode[] = [
     ...[...dir.dirs.values()].map(finalize),
     ...dir.files.values(),
   ].sort(compareByOrder)
-  return {
+  return compactDir({
     kind: 'dir',
     name: dir.name,
     path: dir.path,
     children,
     order: dir.order,
-  }
+  })
 }
 
 export function buildFileTree(files: DiffFile[]): FileTreeNode[] {

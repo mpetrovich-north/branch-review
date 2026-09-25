@@ -1123,9 +1123,11 @@ pre,
   --diff-file-header-clearance: calc(
     (var(--diff-file-header-pad-y) * 2) + 1.6rem + 1px
   );
-  /* Leave room left of the file-header Comment control for the files chip/pane. */
+  /* Leave room left of the file-header Comment control for the files chip. */
   --file-list-comment-slot: 5.75rem;
   --file-list-comment-gap: 0.5rem;
+  /* Gap between sticky file headers and the floating file-list pane. */
+  --file-list-below-header-gap: 0.45rem;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
@@ -1165,13 +1167,7 @@ pre,
   justify-self: end;
   align-self: start;
   position: sticky;
-  /* Anchor top-right to the slot left of the file Comment control. */
-  top: calc(var(--sticky-top) + var(--diff-file-header-pad-y));
   box-sizing: border-box;
-  margin-top: var(--diff-file-header-pad-y);
-  margin-right: calc(
-    1.1rem + var(--file-list-comment-slot) + var(--file-list-comment-gap)
-  );
   background: var(--file-list-glass);
   border: 1px solid var(--file-list-glass-border);
   -webkit-backdrop-filter: blur(28px) saturate(1.45);
@@ -1184,9 +1180,15 @@ pre,
   transform-origin: top right;
 }
 
-/* Always-visible chip under the expanded pane (shows through when the pane fades). */
+/* Always-visible chip in the file-header row (shows through when the pane fades). */
 .file-list-chip {
   z-index: 24;
+  /* Anchor top-right to the slot left of the file Comment control. */
+  top: calc(var(--sticky-top) + var(--diff-file-header-pad-y));
+  margin-top: var(--diff-file-header-pad-y);
+  margin-right: calc(
+    1.1rem + var(--file-list-comment-slot) + var(--file-list-comment-gap)
+  );
   width: max-content;
   min-width: var(--file-list-comment-slot);
   height: 1.6rem;
@@ -1235,10 +1237,20 @@ pre,
 
 .file-list {
   z-index: 25;
+  /* Sit just below sticky file headers; keep that offset while scrolling. */
+  top: calc(
+    var(--sticky-top) + var(--diff-file-header-clearance) +
+      var(--file-list-below-header-gap)
+  );
+  margin-top: calc(
+    var(--diff-file-header-clearance) + var(--file-list-below-header-gap)
+  );
+  margin-right: 1.1rem;
   width: var(--file-list-width, max-content);
   max-width: min(30rem, calc(100% - 2.2rem));
   max-height: calc(
-    100vh - var(--sticky-top) - var(--diff-file-header-pad-y) - 1.5rem
+    100vh - var(--sticky-top) - var(--diff-file-header-clearance) -
+      var(--file-list-below-header-gap) - 1.5rem
   );
   padding: 0.55rem 0.55rem 0.45rem;
   border-radius: 6px;
