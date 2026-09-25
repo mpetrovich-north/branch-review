@@ -1961,12 +1961,15 @@ pre,
   display: block;
 }
 
-.diff-file-title strong {
+.diff-file-title .diff-file-path {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
+  /* Ellipsis on the left; keep the filename (path end) visible. */
+  direction: rtl;
+  text-align: left;
 }
 
 .diff-file-icon {

@@ -1210,7 +1210,11 @@ function FileDiffSection({
             <StatusIcon status={file.status} />
           </span>
           <FileIcon className="diff-file-icon" />
-          <strong>{file.path}</strong>
+          <strong className="diff-file-path" title={file.path}>
+            {/* LRM keeps LTR punctuation (e.g. .tsx) attached under rtl ellipsis. */}
+            {file.path}
+            {'\u200E'}
+          </strong>
         </div>
         <div className="diff-file-actions">
           <DiffStat {...countFileDiffStats(displayFile)} />
