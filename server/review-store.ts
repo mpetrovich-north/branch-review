@@ -182,7 +182,20 @@ export async function updateComment(
     throw Object.assign(new Error(`Comment not found: ${commentId}`), { status: 404 })
   }
   const existing = file.comments[index]!
-  file.comments[index] = { ...existing, body: data.body }
+  const next: Comment = { ...existing }
+  if (data.body !== undefined) {
+    next.body = data.body
+  }
+  if (data.resolved !== undefined) {
+    if (data.resolved) {
+      next.resolved = true
+      next.resolvedAt = new Date().toISOString()
+    } else {
+      delete next.resolved
+      delete next.resolvedAt
+    }
+  }
+  file.comments[index] = next
   file.baseBranch = baseBranch
   file.branch = branch
   return writeCommentsFile(repoPath, file)

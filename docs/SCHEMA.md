@@ -80,6 +80,22 @@ No `line`, `lineType`, or `snippet` on file comments.
 
 No `path`, `line`, `lineType`, or `snippet` on commit comments.
 
+### Resolved comments
+
+Optional on any comment kind. When addressed, keep the comment and mark it
+resolved instead of deleting it.
+
+```json
+{
+  "resolved": true,
+  "resolvedAt": "2026-09-17T21:00:00.000Z"
+}
+```
+
+- Omit `resolved` / `resolvedAt` (or set `resolved` to `false`) for open comments.
+- Apply mode must set these fields after a successful fix; do not remove the comment object.
+- Hard delete remains available for mistakes only.
+
 ### Message edits
 
 Optional map of commit SHA → overlay for the subject and/or body. Missing keys use the git commit text. Does not rewrite git history.

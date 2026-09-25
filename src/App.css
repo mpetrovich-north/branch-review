@@ -551,6 +551,34 @@ pre,
   box-shadow: none;
 }
 
+.commit-list-branch {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  padding: 0.55rem 0.85rem 0.5rem;
+  min-width: 0;
+}
+
+.commit-list-branch-name {
+  margin: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.commit-list-branch .diff-stat {
+  font-size: 0.72rem;
+}
+
 .commit-list-count {
   flex: 0 0 auto;
   position: relative;
@@ -1045,6 +1073,27 @@ pre,
   height: 14px;
 }
 
+.diff-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.diff-stat-added {
+  color: var(--status-added);
+}
+
+.diff-stat-removed {
+  color: var(--danger);
+}
+
 .reviewed-toggle {
   display: inline-flex;
   align-items: center;
@@ -1123,9 +1172,9 @@ pre,
   --diff-file-header-clearance: calc(
     (var(--diff-file-header-pad-y) * 2) + 1.6rem + 1px
   );
-  /* Leave room left of the file-header Comment control for the files chip. */
-  --file-list-comment-slot: 5.75rem;
-  --file-list-comment-gap: 0.5rem;
+  /* Leave room at the right of the file header for the files chip. */
+  --file-list-chip-slot: 5.75rem;
+  --file-list-chip-gap: 0.5rem;
   /* Gap between sticky file headers and the floating file-list pane. */
   --file-list-below-header-gap: 0.45rem;
   display: grid;
@@ -1180,17 +1229,14 @@ pre,
   transform-origin: top right;
 }
 
-/* Always-visible chip in the file-header row (shows through when the pane fades). */
+/* Always-visible chip at the far right of the file-header row. */
 .file-list-chip {
   z-index: 24;
-  /* Anchor top-right to the slot left of the file Comment control. */
   top: calc(var(--sticky-top) + var(--diff-file-header-pad-y));
   margin-top: var(--diff-file-header-pad-y);
-  margin-right: calc(
-    1.1rem + var(--file-list-comment-slot) + var(--file-list-comment-gap)
-  );
+  margin-right: 1.1rem;
   width: max-content;
-  min-width: var(--file-list-comment-slot);
+  min-width: var(--file-list-chip-slot);
   height: 1.6rem;
   min-height: 1.6rem;
   max-height: 1.6rem;
@@ -1580,10 +1626,23 @@ pre,
   gap: 1rem;
   padding: var(--diff-file-header-pad-y, 0.55rem) 1.1rem;
   padding-left: 0;
+  /* Clear the sticky files chip at the far right. */
+  padding-right: calc(
+    1.1rem + var(--file-list-chip-slot) + var(--file-list-chip-gap)
+  );
   border-bottom: 1px solid var(--border);
   font-family: var(--mono);
   font-size: 0.8rem;
   background: var(--surface);
+}
+
+.diff-file-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .diff-file-title {
@@ -1733,6 +1792,18 @@ pre,
   font-size: 0.78rem;
 }
 
+.comment-thread.is-resolved {
+  filter: grayscale(1);
+  opacity: 0.72;
+  background: color-mix(in srgb, var(--muted) 12%, var(--surface));
+  border-color: color-mix(in srgb, var(--muted) 35%, var(--border));
+}
+
+.comment-thread.is-resolved.is-collapsed {
+  padding: 0.4rem 0.65rem;
+  margin: 0.4rem 0;
+}
+
 .comment-thread.is-editing {
   z-index: 4;
 }
@@ -1746,8 +1817,16 @@ pre,
   margin: 0.5rem 0.75rem 0.55rem 5.5rem;
 }
 
+.comment-thread.inline.is-resolved.is-collapsed {
+  margin: 0.35rem 0.75rem 0.4rem 5.5rem;
+}
+
 .comment-thread.file-level {
   margin: 0.65rem 0.85rem;
+}
+
+.comment-thread.file-level.is-resolved.is-collapsed {
+  margin: 0.45rem 0.85rem;
 }
 
 .comment-edit-overlay {
@@ -1790,6 +1869,12 @@ pre,
   align-items: start;
 }
 
+.comment-view-actions {
+  display: inline-flex;
+  align-items: start;
+  gap: 0.15rem;
+}
+
 .comment-body-hit {
   display: block;
   width: 100%;
@@ -1808,6 +1893,51 @@ pre,
 
 .comment-body-hit:disabled {
   cursor: default;
+}
+
+.comment-resolved-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.55rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.comment-resolved-label {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.comment-resolved-preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.comment-chevron {
+  display: block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin: 0.2rem 0 0 0.15rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.12s ease;
+}
+
+.comment-chevron.is-open {
+  margin-top: 0.05rem;
+  transform: rotate(45deg);
 }
 
 .comment-icon-btn {
@@ -1830,6 +1960,14 @@ pre,
 
 .comment-icon-btn:hover:not(:disabled) {
   color: var(--accent);
+}
+
+.comment-resolve-btn.is-resolved {
+  color: var(--muted);
+}
+
+.comment-resolve-btn:hover:not(:disabled) {
+  color: var(--status-added);
 }
 
 .comment-delete-btn:hover:not(:disabled) {

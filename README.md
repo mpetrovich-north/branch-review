@@ -41,7 +41,7 @@ npm run dev
 2. Review commits on the review branch that are not on the base branch.
 3. Comment on a commit, a file, or a diff line.
 4. Comments are written to `.branch-review/comments/<branch-slug>.json` for the **review** branch.
-5. Edit or delete a comment in the UI when it is done (agents may also delete after apply).
+5. Resolve a comment in the UI when it is done (keeps it on disk, collapsed). Hard-delete only for mistakes. Agents mark comments resolved after apply.
 
 ## On-disk layout
 

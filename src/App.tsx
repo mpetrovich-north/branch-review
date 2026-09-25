@@ -13,6 +13,7 @@ import {
   setActiveRepoPath,
 } from './api'
 import { CommitReview } from './CommitReview'
+import { DiffStat } from './DiffStat'
 import {
   CheckboxIcon,
   CommitIcon,
@@ -26,6 +27,7 @@ import type {
   Comment,
   CommitSummary,
   DiffFile,
+  DiffStatCounts,
   MessageEdit,
   MetaResponse,
   RepoInfo,
@@ -148,6 +150,7 @@ export default function App() {
   const [baseDraft, setBaseDraft] = useState('main')
   const [reviewDraft, setReviewDraft] = useState('')
   const [commits, setCommits] = useState<CommitSummary[]>([])
+  const [branchStats, setBranchStats] = useState<DiffStatCounts | null>(null)
   const [selectedSha, setSelectedSha] = useState<string | null>(null)
   const [files, setFiles] = useState<DiffFile[]>([])
   const [comments, setComments] = useState<Comment[]>([])
@@ -180,6 +183,7 @@ export default function App() {
   const loadReviewData = useCallback(async () => {
     const [commitRes, commentRes] = await Promise.all([fetchCommits(), fetchComments()])
     setCommits(commitRes.commits)
+    setBranchStats(commitRes.stats)
     setComments(commentRes.comments)
     setMessageEdits(commentRes.messageEdits ?? {})
     setReviewedShas(commentRes.reviewedShas ?? [])
@@ -201,6 +205,7 @@ export default function App() {
       hydrated.current = false
       setError(null)
       setCommits([])
+      setBranchStats(null)
       setFiles([])
       setComments([])
       setMessageEdits({})
@@ -490,6 +495,7 @@ export default function App() {
         setRepoPath(null)
         setMeta(null)
         setCommits([])
+        setBranchStats(null)
         setFiles([])
         setComments([])
         setMessageEdits({})
@@ -710,92 +716,105 @@ export default function App() {
             <div id="commit-list-body" className="commit-list-body">
               {noRepos ? null : !meta ? (
                 <p className="empty">Loading repository…</p>
-              ) : !ready ? null : commits.length === 0 ? (
-                <p className="empty">No commits ahead of the base branch.</p>
-              ) : (
+              ) : !ready ? null : (
                 <>
-                  <div
-                    className={`commit-list-count${commitsScrolled ? ' is-scrolled' : ''}`}
-                  >
-                    <span>
-                      {commits.length} {commits.length === 1 ? 'commit' : 'commits'}
-                    </span>
-                    <span className="commit-list-filters">
-                      <label className="commit-filter-toggle" title="Show reviewed commits">
-                        <input
-                          type="checkbox"
-                          className="visually-hidden"
-                          checked={showReviewed}
-                          onChange={(e) => setShowReviewed(e.target.checked)}
-                        />
-                        <CheckboxIcon checked={showReviewed} />
-                        Reviewed
-                      </label>
-                      <label className="commit-filter-toggle" title="Show merge commits">
-                        <input
-                          type="checkbox"
-                          className="visually-hidden"
-                          checked={showMerges}
-                          onChange={(e) => setShowMerges(e.target.checked)}
-                        />
-                        <CheckboxIcon checked={showMerges} />
-                        Merges
-                      </label>
-                    </span>
+                  <div className="commit-list-branch">
+                    <h2 className="commit-list-branch-name" title={reviewDraft}>
+                      {reviewDraft}
+                    </h2>
+                    {branchStats ? <DiffStat {...branchStats} /> : null}
                   </div>
-                  {visibleCommits.length === 0 ? (
-                    <p className="empty">No commits to show.</p>
+                  {commits.length === 0 ? (
+                    <p className="empty">No commits ahead of the base branch.</p>
                   ) : (
-                    <div
-                      className="commit-list-scroll"
-                      onScroll={(e) => {
-                        setCommitsScrolled(e.currentTarget.scrollTop > 0)
-                      }}
-                    >
-                      <ol>
-                        {commits.map((c) => {
-                          if (!showReviewed && reviewedSet.has(c.sha)) return null
-                          if (!showMerges && c.isMerge) return null
-                          return (
-                            <li key={c.sha}>
-                              <button
-                                type="button"
-                                className={c.sha === selectedSha ? 'active' : ''}
-                                onClick={() => {
-                                  setSeedFilePath(null)
-                                  setSelectedSha(c.sha)
-                                }}
-                              >
-                                <span
-                                  className={`idx${reviewedSet.has(c.sha) ? ' is-reviewed' : ''}`}
-                                >
-                                  {reviewedSet.has(c.sha) ? (
-                                    <CheckIcon
-                                      className="commit-list-type-icon"
-                                      title="Reviewed"
-                                    />
-                                  ) : c.isMerge ? (
-                                    <MergeIcon
-                                      className="commit-list-type-icon"
-                                      title="Merge commit"
-                                    />
-                                  ) : (
-                                    <CommitIcon
-                                      className="commit-list-type-icon"
-                                      title="Commit"
-                                    />
-                                  )}
-                                </span>
-                                <span className="subject">
-                                  {messageEdits[c.sha]?.subject ?? c.subject}
-                                </span>
-                                <code className="sha">{c.shortSha}</code>
-                              </button>
-                            </li>
-                          )
-                        })}
-                      </ol>
-                    </div>
+                    <>
+                      <div
+                        className={`commit-list-count${commitsScrolled ? ' is-scrolled' : ''}`}
+                      >
+                        <span>
+                          {commits.length} {commits.length === 1 ? 'commit' : 'commits'}
+                        </span>
+                        <span className="commit-list-filters">
+                          <label
+                            className="commit-filter-toggle"
+                            title="Show reviewed commits"
+                          >
+                            <input
+                              type="checkbox"
+                              className="visually-hidden"
+                              checked={showReviewed}
+                              onChange={(e) => setShowReviewed(e.target.checked)}
+                            />
+                            <CheckboxIcon checked={showReviewed} />
+                            Reviewed
+                          </label>
+                          <label className="commit-filter-toggle" title="Show merge commits">
+                            <input
+                              type="checkbox"
+                              className="visually-hidden"
+                              checked={showMerges}
+                              onChange={(e) => setShowMerges(e.target.checked)}
+                            />
+                            <CheckboxIcon checked={showMerges} />
+                            Merges
+                          </label>
+                        </span>
+                      </div>
+                      {visibleCommits.length === 0 ? (
+                        <p className="empty">No commits to show.</p>
+                      ) : (
+                        <div
+                          className="commit-list-scroll"
+                          onScroll={(e) => {
+                            setCommitsScrolled(e.currentTarget.scrollTop > 0)
+                          }}
+                        >
+                          <ol>
+                            {commits.map((c) => {
+                              if (!showReviewed && reviewedSet.has(c.sha)) return null
+                              if (!showMerges && c.isMerge) return null
+                              return (
+                                <li key={c.sha}>
+                                  <button
+                                    type="button"
+                                    className={c.sha === selectedSha ? 'active' : ''}
+                                    onClick={() => {
+                                      setSeedFilePath(null)
+                                      setSelectedSha(c.sha)
+                                    }}
+                                  >
+                                    <span
+                                      className={`idx${reviewedSet.has(c.sha) ? ' is-reviewed' : ''}`}
+                                    >
+                                      {reviewedSet.has(c.sha) ? (
+                                        <CheckIcon
+                                          className="commit-list-type-icon"
+                                          title="Reviewed"
+                                        />
+                                      ) : c.isMerge ? (
+                                        <MergeIcon
+                                          className="commit-list-type-icon"
+                                          title="Merge commit"
+                                        />
+                                      ) : (
+                                        <CommitIcon
+                                          className="commit-list-type-icon"
+                                          title="Commit"
+                                        />
+                                      )}
+                                    </span>
+                                    <span className="subject">
+                                      {messageEdits[c.sha]?.subject ?? c.subject}
+                                    </span>
+                                    <code className="sha">{c.shortSha}</code>
+                                  </button>
+                                </li>
+                              )
+                            })}
+                          </ol>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}

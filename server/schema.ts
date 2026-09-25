@@ -2,6 +2,12 @@ import { z } from 'zod'
 
 export const lineTypeSchema = z.enum(['added', 'removed', 'unchanged'])
 
+const commentResolvedFields = {
+  /** When true, comment stays on disk but is treated as done. Omit or false = open. */
+  resolved: z.boolean().optional(),
+  resolvedAt: z.string().datetime().optional(),
+}
+
 export const lineCommentSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('line'),
@@ -12,6 +18,7 @@ export const lineCommentSchema = z.object({
   snippet: z.string().optional(),
   body: z.string().min(1),
   createdAt: z.string().datetime(),
+  ...commentResolvedFields,
 })
 
 export const fileCommentSchema = z.object({
@@ -21,6 +28,7 @@ export const fileCommentSchema = z.object({
   path: z.string().min(1),
   body: z.string().min(1),
   createdAt: z.string().datetime(),
+  ...commentResolvedFields,
 })
 
 export const commitCommentSchema = z.object({
@@ -29,6 +37,7 @@ export const commitCommentSchema = z.object({
   commitSha: z.string().min(1),
   body: z.string().min(1),
   createdAt: z.string().datetime(),
+  ...commentResolvedFields,
 })
 
 export const commentSchema = z.discriminatedUnion('kind', [
@@ -100,9 +109,14 @@ export const createCommentSchema = z.discriminatedUnion('kind', [
   createCommitCommentSchema,
 ])
 
-export const updateCommentSchema = z.object({
-  body: z.string().min(1),
-})
+export const updateCommentSchema = z
+  .object({
+    body: z.string().min(1).optional(),
+    resolved: z.boolean().optional(),
+  })
+  .refine((value) => value.body !== undefined || value.resolved !== undefined, {
+    message: 'Provide body and/or resolved',
+  })
 
 export const upsertMessageEditSchema = z
   .object({

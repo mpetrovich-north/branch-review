@@ -10,6 +10,8 @@ export type LineComment = {
   snippet?: string
   body: string
   createdAt: string
+  resolved?: boolean
+  resolvedAt?: string
 }
 
 export type FileComment = {
@@ -19,6 +21,8 @@ export type FileComment = {
   path: string
   body: string
   createdAt: string
+  resolved?: boolean
+  resolvedAt?: string
 }
 
 export type CommitComment = {
@@ -27,6 +31,8 @@ export type CommitComment = {
   commitSha: string
   body: string
   createdAt: string
+  resolved?: boolean
+  resolvedAt?: string
 }
 
 export type Comment = LineComment | FileComment | CommitComment
@@ -65,6 +71,11 @@ export type CommitSummary = {
   authorEmail: string
   authoredAt: string
   isMerge: boolean
+}
+
+export type DiffStatCounts = {
+  added: number
+  removed: number
 }
 
 export type DiffLine = {

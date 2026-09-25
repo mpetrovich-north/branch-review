@@ -133,6 +133,32 @@ export async function getCommitDiff(repoPath: string, sha: string): Promise<Diff
   return parseUnifiedDiff(stdout)
 }
 
+export type DiffStatCounts = {
+  added: number
+  removed: number
+}
+
+/** Net line adds/removes for review tip vs base (three-dot range). */
+export async function getRangeDiffStat(
+  repoPath: string,
+  baseBranch: string,
+  reviewBranch: string,
+): Promise<DiffStatCounts> {
+  const baseSha = await resolveCommitish(repoPath, baseBranch)
+  const reviewSha = await resolveCommitish(repoPath, reviewBranch)
+  const stdout = await git(repoPath, ['diff', '--numstat', `${baseSha}...${reviewSha}`])
+  let added = 0
+  let removed = 0
+  for (const line of stdout.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    const [addRaw, delRaw] = trimmed.split('\t')
+    if (addRaw && addRaw !== '-') added += Number(addRaw)
+    if (delRaw && delRaw !== '-') removed += Number(delRaw)
+  }
+  return { added, removed }
+}
+
 export function parseUnifiedDiff(diffText: string): DiffFile[] {
   const files: DiffFile[] = []
   const chunks = diffText.split(/^diff --git /m).filter(Boolean)

@@ -7,6 +7,7 @@ import {
   detectDefaultBranch,
   getCheckedOutBranch,
   getCommitDiff,
+  getRangeDiffStat,
   GitError,
   inferStackBaseBranch,
   listBranches,
@@ -203,15 +204,15 @@ app.get(
       res.status(400).json({ error: 'Set reviewBranch and baseBranch in config first' })
       return
     }
-    const commits = await listCommitsNotInBase(
-      repoPath,
-      config.baseBranch,
-      config.reviewBranch,
-    )
+    const [commits, stats] = await Promise.all([
+      listCommitsNotInBase(repoPath, config.baseBranch, config.reviewBranch),
+      getRangeDiffStat(repoPath, config.baseBranch, config.reviewBranch),
+    ])
     res.json({
       baseBranch: config.baseBranch,
       reviewBranch: config.reviewBranch,
       commits,
+      stats,
     })
   }),
 )

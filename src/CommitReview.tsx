@@ -18,9 +18,10 @@ import type {
   LineType,
   MessageEdit,
 } from './types'
-import { createComment, removeComment, setReviewed, updateComment, upsertMessageEdit } from './api'
+import { createComment, removeComment, setCommentResolved, setReviewed, updateComment, upsertMessageEdit } from './api'
 import { buildFileTree, collectDirPaths, type FileTreeNode } from './fileTree'
 import {
+  CheckIcon,
   CheckboxIcon,
   CommentBubbleIcon,
   CommitIcon,
@@ -31,6 +32,7 @@ import {
   TrashIcon,
 } from './icons'
 import { useHighlightedDiff, type LineTokens } from './highlight'
+import { countFileDiffStats, DiffStat, sumDiffStats } from './DiffStat'
 import type { ThemedToken } from 'shiki'
 
 function isSaveShortcut(e: { key: string; metaKey: boolean; ctrlKey: boolean }): boolean {
@@ -363,25 +365,47 @@ function formatCommitTime(iso: string): string {
   })
 }
 
+function isCommentResolved(comment: Comment): boolean {
+  return comment.resolved === true
+}
+
+function commentPreview(body: string): string {
+  const firstLine = body.split(/\r?\n/, 1)[0] ?? ''
+  return firstLine.length > 120 ? `${firstLine.slice(0, 117)}…` : firstLine
+}
+
 function EditableComment({
   comment,
   busy,
   onSave,
+  onResolve,
   onDelete,
   className,
 }: {
   comment: Comment
   busy: boolean
   onSave: (id: string, body: string) => Promise<void>
+  onResolve: (id: string, resolved: boolean) => Promise<void>
   onDelete: (id: string) => Promise<void>
   className?: string
 }) {
+  const resolved = isCommentResolved(comment)
   const [editing, setEditing] = useState(false)
+  const [expanded, setExpanded] = useState(!resolved)
   const [draft, setDraft] = useState(comment.body)
 
   useEffect(() => {
     if (!editing) setDraft(comment.body)
   }, [comment.body, editing])
+
+  useEffect(() => {
+    if (resolved) {
+      setExpanded(false)
+      setEditing(false)
+    } else {
+      setExpanded(true)
+    }
+  }, [resolved, comment.id])
 
   async function save() {
     if (!draft.trim() || draft.trim() === comment.body) {
@@ -394,44 +418,93 @@ function EditableComment({
   }
 
   function beginEdit() {
-    if (busy) return
+    if (busy || resolved) return
     setDraft(comment.body)
     setEditing(true)
+    setExpanded(true)
   }
 
+  const threadClass = [
+    'comment-thread',
+    editing ? 'is-editing' : '',
+    resolved ? 'is-resolved' : '',
+    resolved && !expanded ? 'is-collapsed' : '',
+    className ?? '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <div
-      className={`comment-thread${editing ? ' is-editing' : ''}${className ? ` ${className}` : ''}`}
-    >
+    <div className={threadClass}>
       <div className="comment-view" aria-hidden={editing || undefined}>
-        <button
-          type="button"
-          className="comment-icon-btn comment-edit-btn"
-          title="Edit comment"
-          aria-label="Edit comment"
-          disabled={busy || editing}
-          onClick={beginEdit}
-        >
-          <EditIcon />
-        </button>
-        <button
-          type="button"
-          className="comment-body-hit"
-          disabled={busy || editing}
-          onClick={beginEdit}
-        >
-          {comment.body}
-        </button>
-        <button
-          type="button"
-          className="comment-icon-btn comment-delete-btn"
-          title="Delete comment"
-          aria-label="Delete comment"
-          disabled={busy || editing}
-          onClick={() => void onDelete(comment.id)}
-        >
-          <TrashIcon />
-        </button>
+        {resolved ? (
+          <button
+            type="button"
+            className="comment-icon-btn comment-expand-btn"
+            title={expanded ? 'Collapse resolved comment' : 'Expand resolved comment'}
+            aria-label={expanded ? 'Collapse resolved comment' : 'Expand resolved comment'}
+            aria-expanded={expanded}
+            disabled={busy || editing}
+            onClick={() => setExpanded((prev) => !prev)}
+          >
+            <span className={`comment-chevron${expanded ? ' is-open' : ''}`} aria-hidden="true" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="comment-icon-btn comment-edit-btn"
+            title="Edit comment"
+            aria-label="Edit comment"
+            disabled={busy || editing}
+            onClick={beginEdit}
+          >
+            <EditIcon />
+          </button>
+        )}
+        {resolved && !expanded ? (
+          <button
+            type="button"
+            className="comment-body-hit comment-resolved-summary"
+            disabled={busy}
+            onClick={() => setExpanded(true)}
+          >
+            <span className="comment-resolved-label">Resolved</span>
+            <span className="comment-resolved-preview">{commentPreview(comment.body)}</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="comment-body-hit"
+            disabled={busy || editing || resolved}
+            onClick={resolved ? undefined : beginEdit}
+          >
+            {comment.body}
+          </button>
+        )}
+        <div className="comment-view-actions">
+          <button
+            type="button"
+            className={`comment-icon-btn comment-resolve-btn${resolved ? ' is-resolved' : ''}`}
+            title={resolved ? 'Reopen comment' : 'Resolve comment'}
+            aria-label={resolved ? 'Reopen comment' : 'Resolve comment'}
+            disabled={busy || editing}
+            onClick={() => void onResolve(comment.id, !resolved)}
+          >
+            <CheckIcon />
+          </button>
+          {!resolved ? (
+            <button
+              type="button"
+              className="comment-icon-btn comment-delete-btn"
+              title="Delete comment"
+              aria-label="Delete comment"
+              disabled={busy || editing}
+              onClick={() => void onDelete(comment.id)}
+            >
+              <TrashIcon />
+            </button>
+          ) : null}
+        </div>
       </div>
       {editing ? (
         <div className="compose-panel comment-edit-overlay">
@@ -460,6 +533,7 @@ function EditableComment({
     </div>
   )
 }
+
 
 type NameHover = {
   text: string
@@ -614,6 +688,7 @@ function FileDiffSection({
   onSubmitFile,
   onClearDrafts,
   onEdit,
+  onResolve,
   onDelete,
 }: {
   file: DiffFile
@@ -640,6 +715,7 @@ function FileDiffSection({
   onSubmitFile: () => void
   onClearDrafts: () => void
   onEdit: (id: string, body: string) => Promise<void>
+  onResolve: (id: string, resolved: boolean) => Promise<void>
   onDelete: (id: string) => Promise<void>
 }) {
   const highlighted: LineTokens[] | null = useHighlightedDiff(file)
@@ -654,16 +730,19 @@ function FileDiffSection({
           <FileIcon className="diff-file-icon" />
           <strong>{file.path}</strong>
         </div>
-        <button
-          type="button"
-          className="comment-bubble"
-          title="Comment on this file"
-          aria-label="Comment on this file"
-          onClick={() => onStartFileComment(file.path)}
-        >
-          <CommentBubbleIcon />
-          Comment
-        </button>
+        <div className="diff-file-actions">
+          <DiffStat {...countFileDiffStats(file)} />
+          <button
+            type="button"
+            className="comment-bubble"
+            title="Comment on this file"
+            aria-label="Comment on this file"
+            onClick={() => onStartFileComment(file.path)}
+          >
+            <CommentBubbleIcon />
+            Comment
+          </button>
+        </div>
       </div>
       {fileComments.map((c) => (
         <EditableComment
@@ -671,6 +750,7 @@ function FileDiffSection({
           comment={c}
           busy={busy}
           onSave={onEdit}
+          onResolve={onResolve}
           onDelete={onDelete}
           className="file-level"
         />
@@ -744,6 +824,7 @@ function FileDiffSection({
                     comment={c}
                     busy={busy}
                     onSave={onEdit}
+                    onResolve={onResolve}
                     onDelete={onDelete}
                     className="inline"
                   />
@@ -959,6 +1040,7 @@ export function CommitReview({
     const map = new Map<string, number>()
     for (const c of comments) {
       if (c.commitSha !== commit.sha) continue
+      if (isCommentResolved(c)) continue
       if (c.kind === 'line' || c.kind === 'file') {
         map.set(c.path, (map.get(c.path) ?? 0) + 1)
       }
@@ -1182,7 +1264,20 @@ export function CommitReview({
     setBusy(true)
     setError(null)
     try {
-      const file = await updateComment(id, nextBody)
+      const file = await updateComment(id, { body: nextBody })
+      onReviewFileChange(file)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update comment')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onResolve(id: string, resolved: boolean) {
+    setBusy(true)
+    setError(null)
+    try {
+      const file = await setCommentResolved(id, resolved)
       onReviewFileChange(file)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update comment')
@@ -1268,6 +1363,7 @@ export function CommitReview({
             </p>
           </div>
           <div className="commit-nav-group">
+            <DiffStat {...sumDiffStats(files)} />
             <button
               type="button"
               className="comment-bubble"
@@ -1334,6 +1430,7 @@ export function CommitReview({
               comment={c}
               busy={busy}
               onSave={onEdit}
+              onResolve={onResolve}
               onDelete={onDelete}
             />
           ))}
@@ -1406,6 +1503,7 @@ export function CommitReview({
                 onSubmitFile={() => void submitFile()}
                 onClearDrafts={clearDrafts}
                 onEdit={onEdit}
+                onResolve={onResolve}
                 onDelete={onDelete}
               />
             ))

@@ -3,6 +3,7 @@ import type {
   CommentsFile,
   CommitSummary,
   DiffFile,
+  DiffStatCounts,
   MetaResponse,
   RepoInfo,
   ReviewConfig,
@@ -134,6 +135,7 @@ export function fetchCommits() {
     baseBranch: string
     reviewBranch: string
     commits: CommitSummary[]
+    stats: DiffStatCounts
   }>('/api/commits')
 }
 
@@ -152,11 +154,18 @@ export function createComment(body: unknown) {
   })
 }
 
-export function updateComment(id: string, body: string) {
+export function updateComment(
+  id: string,
+  patch: { body?: string; resolved?: boolean },
+) {
   return request<CommentsFile>(`/api/comments/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ body }),
+    body: JSON.stringify(patch),
   })
+}
+
+export function setCommentResolved(id: string, resolved: boolean) {
+  return updateComment(id, { resolved })
 }
 
 export function removeComment(id: string) {
