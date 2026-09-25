@@ -163,6 +163,7 @@ function orderedOpenCommentIdsForFile(
 }
 
 function CommitBodyDisplay({ body }: { body: string }) {
+  const clipRef = useRef<HTMLDivElement>(null)
   const preRef = useRef<HTMLPreElement>(null)
   const [expanded, setExpanded] = useState(false)
   const [needsToggle, setNeedsToggle] = useState(false)
@@ -174,20 +175,25 @@ function CommitBodyDisplay({ body }: { body: string }) {
 
   useLayoutEffect(() => {
     if (expanded) return
-    const el = preRef.current
-    if (!el) return
-    setNeedsToggle(el.scrollHeight > el.clientHeight + 1)
+    const clip = clipRef.current
+    const pre = preRef.current
+    if (!clip || !pre) return
+    setNeedsToggle(pre.scrollHeight > clip.clientHeight + 1)
   }, [body, expanded])
 
   return (
     <div className="commit-body-wrap">
-      <pre
-        ref={preRef}
-        className={`commit-body${expanded ? '' : ' is-clamped'}`}
+      <div
+        ref={clipRef}
+        className={`commit-body-clip${expanded ? '' : ' is-clamped'}${
+          !expanded && needsToggle ? ' is-faded' : ''
+        }`}
       >
-        {body}
-      </pre>
-      {needsToggle ? (
+        <pre ref={preRef} className="commit-body">
+          {body}
+        </pre>
+      </div>
+      {needsToggle || expanded ? (
         <button
           type="button"
           className="btn link commit-body-toggle"
@@ -1208,44 +1214,50 @@ function FileDiffSection({
         </div>
         <div className="diff-file-actions">
           <DiffStat {...countFileDiffStats(displayFile)} />
-          {fileCommentIds.length > 0 ? (
-            <div className="file-comment-nav">
-              <button
-                type="button"
-                className="file-comment-nav-caret"
-                title="Previous comment"
-                aria-label="Previous comment"
-                disabled={!canPrevComment}
-                onClick={onPrevComment}
-              >
-                <CaretLeftIcon />
-              </button>
-              <button
-                type="button"
-                className="file-comment-nav-count"
-                title={`Go to first of ${fileCommentIds.length} comment${
-                  fileCommentIds.length === 1 ? '' : 's'
-                }`}
-                aria-label={`Go to first of ${fileCommentIds.length} comment${
-                  fileCommentIds.length === 1 ? '' : 's'
-                }`}
-                onClick={onFirstComment}
-              >
-                <CommentBubbleIcon />
-                <span>{fileCommentIds.length}</span>
-              </button>
-              <button
-                type="button"
-                className="file-comment-nav-caret"
-                title="Next comment"
-                aria-label="Next comment"
-                disabled={!canNextComment}
-                onClick={onNextComment}
-              >
-                <CaretRightIcon />
-              </button>
-            </div>
-          ) : null}
+          <div className="file-comment-nav">
+            <button
+              type="button"
+              className="file-comment-nav-caret"
+              title="Previous comment"
+              aria-label="Previous comment"
+              disabled={!canPrevComment}
+              onClick={onPrevComment}
+            >
+              <CaretLeftIcon />
+            </button>
+            <button
+              type="button"
+              className="file-comment-nav-count"
+              title={
+                fileCommentIds.length > 0
+                  ? `Go to first of ${fileCommentIds.length} comment${
+                      fileCommentIds.length === 1 ? '' : 's'
+                    }`
+                  : 'No comments in this file'
+              }
+              aria-label={
+                fileCommentIds.length > 0
+                  ? `Go to first of ${fileCommentIds.length} comment${
+                      fileCommentIds.length === 1 ? '' : 's'
+                    }`
+                  : 'No comments in this file'
+              }
+              onClick={onFirstComment}
+            >
+              <CommentBubbleIcon />
+              <span>{fileCommentIds.length}</span>
+            </button>
+            <button
+              type="button"
+              className="file-comment-nav-caret"
+              title="Next comment"
+              aria-label="Next comment"
+              disabled={!canNextComment}
+              onClick={onNextComment}
+            >
+              <CaretRightIcon />
+            </button>
+          </div>
           <button
             type="button"
             className="comment-bubble"
@@ -1511,6 +1523,10 @@ export function CommitReview({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const scrollingToRef = useRef<string | null>(null)
+  const commitReviewRef = useRef<HTMLDivElement>(null)
+  const commitPanelRef = useRef<HTMLElement>(null)
+  const commitStuckSentinelRef = useRef<HTMLDivElement>(null)
+  const [commitStuck, setCommitStuck] = useState(false)
   const [nameHover, setNameHover] = useState<NameHover | null>(null)
   const fileListRef = useRef<HTMLElement | null>(null)
   const fileListWidthFloorRef = useRef(0)
@@ -1649,80 +1665,81 @@ export function CommitReview({
     }
   }, [activeCommentId, orderedReviewComments])
 
+  useLayoutEffect(() => {
+    const panel = commitPanelRef.current
+    const root = commitReviewRef.current
+    if (!panel || !root) return
+
+    const sync = () => {
+      root.style.setProperty(
+        '--commit-header-sticky-height',
+        `${panel.offsetHeight}px`,
+      )
+    }
+    sync()
+    const ro = new ResizeObserver(sync)
+    ro.observe(panel)
+    return () => ro.disconnect()
+  }, [commit.sha])
+
+  // Re-measure after stuck styles (meta hide) apply, same frame as paint.
+  useLayoutEffect(() => {
+    const panel = commitPanelRef.current
+    const root = commitReviewRef.current
+    if (!panel || !root) return
+    root.style.setProperty(
+      '--commit-header-sticky-height',
+      `${panel.offsetHeight}px`,
+    )
+  }, [commitStuck])
+
+  useEffect(() => {
+    const sentinel = commitStuckSentinelRef.current
+    if (!sentinel) return
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        setCommitStuck(!(entry?.isIntersecting ?? true))
+      },
+      { threshold: 0 },
+    )
+    io.observe(sentinel)
+    return () => io.disconnect()
+  }, [commit.sha])
+
   function focusComment(id: string) {
     setActiveCommentId(id)
   }
 
   function commentNavState(filePath: string) {
     const fileIds = commentsByFile.get(filePath) ?? []
-    const activeInFile = Boolean(activeCommentId && fileIds.includes(activeCommentId))
-    const localIndex = activeInFile ? fileIds.indexOf(activeCommentId!) : -1
+    const total = orderedReviewComments
+    const activeIndex = activeCommentId
+      ? total.findIndex((c) => c.id === activeCommentId)
+      : -1
 
-    const fileOrder = files.map((f) => f.path)
-    const filePos = fileOrder.indexOf(filePath)
-
-    function hasCommentsBefore(): boolean {
-      for (let i = 0; i < filePos; i++) {
-        if ((commentsByFile.get(fileOrder[i]!) ?? []).length > 0) return true
-      }
-      return false
-    }
-
-    function hasCommentsAfter(): boolean {
-      for (let i = filePos + 1; i < fileOrder.length; i++) {
-        if ((commentsByFile.get(fileOrder[i]!) ?? []).length > 0) return true
-      }
-      return false
-    }
-
-    function lastCommentBefore(): string | null {
-      for (let i = filePos - 1; i >= 0; i--) {
-        const ids = commentsByFile.get(fileOrder[i]!) ?? []
-        if (ids.length > 0) return ids[ids.length - 1]!
-      }
-      return null
-    }
-
-    function firstCommentAfter(): string | null {
-      for (let i = filePos + 1; i < fileOrder.length; i++) {
-        const ids = commentsByFile.get(fileOrder[i]!) ?? []
-        if (ids.length > 0) return ids[0]!
-      }
-      return null
-    }
-
-    const canPrev = activeInFile
-      ? localIndex > 0 || hasCommentsBefore()
-      : hasCommentsBefore()
-    const canNext = activeInFile
-      ? localIndex < fileIds.length - 1 || hasCommentsAfter()
-      : fileIds.length > 0
+    // Prev/next walk every open comment in the commit, from any file header.
+    const canPrev = total.length > 0 && (activeIndex === -1 || activeIndex > 0)
+    const canNext =
+      total.length > 0 && (activeIndex === -1 || activeIndex < total.length - 1)
 
     function goPrev() {
-      if (activeInFile) {
-        if (localIndex > 0) {
-          focusComment(fileIds[localIndex - 1]!)
-          return
-        }
-        const prev = lastCommentBefore()
-        if (prev) focusComment(prev)
+      if (total.length === 0) return
+      if (activeIndex === -1) {
+        focusComment(total[total.length - 1]!.id)
         return
       }
-      const prev = lastCommentBefore()
-      if (prev) focusComment(prev)
+      if (activeIndex > 0) focusComment(total[activeIndex - 1]!.id)
     }
 
     function goNext() {
-      if (activeInFile) {
-        if (localIndex < fileIds.length - 1) {
-          focusComment(fileIds[localIndex + 1]!)
-          return
-        }
-        const next = firstCommentAfter()
-        if (next) focusComment(next)
+      if (total.length === 0) return
+      if (activeIndex === -1) {
+        focusComment(total[0]!.id)
         return
       }
-      if (fileIds[0]) focusComment(fileIds[0])
+      if (activeIndex < total.length - 1) {
+        focusComment(total[activeIndex + 1]!.id)
+      }
     }
 
     function goFirst() {
@@ -2030,8 +2047,16 @@ export function CommitReview({
   }
 
   return (
-    <div className="commit-review">
-      <section className="commit-message-panel">
+    <div className="commit-review" ref={commitReviewRef}>
+      <div
+        ref={commitStuckSentinelRef}
+        className="commit-sticky-sentinel"
+        aria-hidden="true"
+      />
+      <section
+        className={`commit-message-panel${commitStuck ? ' is-stuck' : ''}`}
+        ref={commitPanelRef}
+      >
         <div className="commit-message-header">
           <div className="commit-title-block">
             <EditableCommitText
@@ -2042,7 +2067,7 @@ export function CommitReview({
               onSave={(value) => saveMessageField('subject', value)}
               onReset={() => resetMessageField('subject')}
             />
-            <p className="meta">
+            <p className="meta commit-title-meta">
               <span className="sha-with-icon">
                 <CommitIcon className="commit-hash-icon" />
                 <code className="sha">{commit.shortSha}</code>

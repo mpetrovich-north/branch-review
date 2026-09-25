@@ -888,13 +888,32 @@ pre,
   color: var(--muted);
 }
 
+.commit-review {
+  --commit-header-sticky-height: 0px;
+  /* Let the sticky panel own the top inset (see .commit-message-panel). */
+  margin-top: -0.85rem;
+}
+
+.commit-sticky-sentinel {
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
 .commit-message-panel {
   /* Text measure is set on mono descendants so `ch` matches the body font. */
-  background: transparent;
+  position: sticky;
+  top: var(--sticky-top);
+  z-index: 14;
+  background: var(--surface);
   border: 0;
+  border-bottom: 1px solid var(--border);
   border-radius: 0;
-  padding: 0.15rem 1.1rem 0.85rem 0;
-  margin-bottom: 0.85rem;
+  /* Same top inset when stuck and at rest (main-pane 0.85 + former panel 0.15). */
+  padding: calc(0.85rem + 0.15rem) 1.1rem 0.55rem 0;
+  margin-bottom: 0;
 }
 
 .commit-message-header {
@@ -904,10 +923,18 @@ pre,
   align-items: flex-start;
 }
 
+.commit-message-panel.is-stuck .commit-message-header {
+  align-items: center;
+}
+
+.commit-message-panel.is-stuck .commit-title-meta {
+  display: none;
+}
+
 .commit-title-block {
   min-width: 0;
   flex: 1 1 auto;
-  max-width: min(100%, calc(72ch + 0.7rem + 2px));
+  max-width: min(100%, calc(80ch + 0.7rem + 2px));
 }
 
 .commit-message-header h2 {
@@ -935,8 +962,8 @@ pre,
   position: relative;
   box-sizing: border-box;
   min-width: 0;
-  /* 72 mono columns of text + horizontal padding/border. */
-  max-width: min(100%, calc(72ch + 0.7rem + 2px));
+  /* 80 mono columns of text + horizontal padding/border. */
+  max-width: min(100%, calc(80ch + 0.7rem + 2px));
   padding: 0.35rem;
   border: 1px solid transparent;
   border-radius: var(--radius);
@@ -1067,7 +1094,7 @@ pre,
   display: flex;
   align-items: center;
   width: 100%;
-  max-width: min(100%, calc(72ch + 0.7rem + 2px));
+  max-width: min(100%, calc(80ch + 0.7rem + 2px));
   margin: 0;
   padding: 0.45rem 0.55rem;
   background: var(--surface);
@@ -1118,7 +1145,7 @@ pre,
   position: relative;
   z-index: 1;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: flex-start;
   gap: 1rem 1.25rem;
   min-width: 0;
@@ -1127,16 +1154,33 @@ pre,
   font-size: 0.8rem;
 }
 
+/* Sit near where the meta line was; keep a slim gap so edit outlines do not touch. */
+.commit-message-panel.is-stuck .commit-message-content {
+  margin-top: 0;
+}
+
+.commit-message-panel.is-stuck .commit-display-subject .commit-display-content {
+  padding-bottom: 0.15rem;
+}
+
+.commit-message-panel.is-stuck .commit-display-body .commit-display-content {
+  padding-top: 0.15rem;
+}
+
+/* Description sizes to content (capped); comment fills the rest on one row. */
+.commit-message-content:has(.commit-message-comments) {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(14rem, 1fr);
+}
+
 .commit-message-prose {
-  flex: 0 1 auto;
   min-width: 0;
-  max-width: 100%;
+  max-width: min(100%, calc(80ch + 0.7rem + 2px));
 }
 
 .commit-message-comments {
-  flex: 1 1 18rem;
-  min-width: min(100%, 16rem);
-  max-width: 36rem;
+  min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
@@ -1154,6 +1198,14 @@ pre,
 
 .commit-message-comments .comment-compose.commit-level .compose-panel {
   position: static;
+}
+
+.commit-message-comments .comment-body-hit:not(.comment-resolved-summary) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .comment-bubble {
@@ -1251,20 +1303,41 @@ pre,
   gap: 0.35rem;
 }
 
+.commit-body-clip {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Three lines hard-clipped (no ellipsis); fade the last line when more remains. */
+.commit-body-clip.is-clamped {
+  max-height: calc(0.8rem * 1.4 * 3);
+  overflow: hidden;
+}
+
+.commit-body-clip.is-faded::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(0.8rem * 1.4);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--surface) 0%, transparent),
+    var(--surface)
+  );
+  pointer-events: none;
+}
+
 .commit-body {
   margin: 0;
   white-space: pre-wrap;
   color: var(--text);
   font-size: 0.8rem;
+  line-height: 1.4;
   font-family: var(--mono);
   width: 100%;
-}
-
-.commit-body.is-clamped {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 5;
-  overflow: hidden;
 }
 
 .commit-body-toggle {
@@ -1292,6 +1365,7 @@ pre,
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
   align-items: start;
+  padding-top: 0.85rem;
 }
 
 .diff-files {
@@ -1310,7 +1384,10 @@ pre,
   border-radius: 0;
   overflow: visible;
   min-width: 0;
-  scroll-margin-top: 12px;
+  scroll-margin-top: calc(
+    var(--commit-header-sticky-height, 0px) + var(--diff-file-header-clearance) +
+      12px
+  );
 }
 
 .file-list-chip,
@@ -1339,7 +1416,10 @@ pre,
 /* Always-visible chip at the far right of the file-header row. */
 .file-list-chip {
   z-index: 24;
-  top: calc(var(--sticky-top) + var(--diff-file-header-pad-y));
+  top: calc(
+    var(--sticky-top) + var(--commit-header-sticky-height, 0px) +
+      var(--diff-file-header-pad-y)
+  );
   margin-top: var(--diff-file-header-pad-y);
   margin-right: 1.1rem;
   width: max-content;
@@ -1397,8 +1477,8 @@ pre,
   z-index: 25;
   /* Sit just below sticky file headers; keep that offset while scrolling. */
   top: calc(
-    var(--sticky-top) + var(--diff-file-header-clearance) +
-      var(--file-list-below-header-gap)
+    var(--sticky-top) + var(--commit-header-sticky-height, 0px) +
+      var(--diff-file-header-clearance) + var(--file-list-below-header-gap)
   );
   margin-top: calc(
     var(--diff-file-header-clearance) + var(--file-list-below-header-gap)
@@ -1407,8 +1487,9 @@ pre,
   width: var(--file-list-width, max-content);
   max-width: min(30rem, calc(100% - 2.2rem));
   max-height: calc(
-    100vh - var(--sticky-top) - var(--diff-file-header-clearance) -
-      var(--file-list-below-header-gap) - 1.5rem
+    100vh - var(--sticky-top) - var(--commit-header-sticky-height, 0px) -
+      var(--diff-file-header-clearance) - var(--file-list-below-header-gap) -
+      1.5rem
   );
   padding: 0.55rem 0.55rem 0.45rem;
   border-radius: 6px;
@@ -1720,7 +1801,7 @@ pre,
 
 .diff-file-header {
   position: sticky;
-  top: var(--sticky-top);
+  top: calc(var(--sticky-top) + var(--commit-header-sticky-height, 0px));
   z-index: 12;
   display: flex;
   justify-content: space-between;
@@ -2363,6 +2444,10 @@ pre,
   .diff-layout {
     display: flex;
     flex-direction: column;
+  }
+
+  .commit-message-content:has(.commit-message-comments) {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .commit-list,
