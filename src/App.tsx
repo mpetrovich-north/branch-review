@@ -16,6 +16,7 @@ import { CommitReview } from './CommitReview'
 import { DiffStat } from './DiffStat'
 import {
   CheckboxIcon,
+  CommentBubbleIcon,
   CommitIcon,
   CheckIcon,
   MergeIcon,
@@ -451,6 +452,21 @@ export default function App() {
 
   const reviewedSet = useMemo(() => new Set(reviewedShas), [reviewedShas])
 
+  const commentCountBySha = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const comment of comments) {
+      counts.set(comment.commitSha, (counts.get(comment.commitSha) ?? 0) + 1)
+    }
+    for (const [sha, edit] of Object.entries(messageEdits)) {
+      let extra = 0
+      if (edit.subject !== undefined) extra += 1
+      if (edit.body !== undefined) extra += 1
+      if (extra === 0) continue
+      counts.set(sha, (counts.get(sha) ?? 0) + extra)
+    }
+    return counts
+  }, [comments, messageEdits])
+
   const visibleCommits = useMemo(
     () =>
       commits.filter((c) => {
@@ -793,6 +809,7 @@ export default function App() {
                             {commits.map((c) => {
                               if (!showReviewed && reviewedSet.has(c.sha)) return null
                               if (!showMerges && c.isMerge) return null
+                              const commentCount = commentCountBySha.get(c.sha) ?? 0
                               return (
                                 <li key={c.sha}>
                                   <button
@@ -801,6 +818,7 @@ export default function App() {
                                     onClick={() => {
                                       setSeedFilePath(null)
                                       setSelectedSha(c.sha)
+                                      window.scrollTo(0, 0)
                                     }}
                                   >
                                     <span
@@ -827,7 +845,20 @@ export default function App() {
                                       {messageEdits[c.sha]?.subject ?? c.subject}
                                     </span>
                                     <span className="sha-row">
-                                      <code className="sha">{c.shortSha}</code>
+                                      <span className="sha-row-main">
+                                        <code className="sha">{c.shortSha}</code>
+                                        {commentCount > 0 ? (
+                                          <span
+                                            className="commit-list-comments"
+                                            title={`${commentCount} comment${
+                                              commentCount === 1 ? '' : 's'
+                                            }`}
+                                          >
+                                              <CommentBubbleIcon solid />
+                                            <span>{commentCount}</span>
+                                          </span>
+                                        ) : null}
+                                      </span>
                                       <DiffStat {...c.stats} />
                                     </span>
                                   </button>
@@ -907,11 +938,13 @@ export default function App() {
                     if (!prevVisible) return
                     setSeedFilePath(null)
                     setSelectedSha(prevVisible.sha)
+                    window.scrollTo(0, 0)
                   },
                   onNext: () => {
                     if (!nextVisible) return
                     setSeedFilePath(null)
                     setSelectedSha(nextVisible.sha)
+                    window.scrollTo(0, 0)
                   },
                 }}
               />

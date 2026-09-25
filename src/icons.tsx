@@ -196,12 +196,16 @@ export function MergeIcon(props: IconProps) {
   )
 }
 
-export function CommentBubbleIcon(props: IconProps) {
+export function CommentBubbleIcon({
+  solid = false,
+  ...props
+}: IconProps & { solid?: boolean }) {
   return (
     <Svg {...props} className={props.className}>
       <path
         d="M2.5 2.75h11a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H7.2L4 14.25v-2.999H2.5a1 1 0 0 1-1-1v-6.5a1 1 0 0 1 1-1Z"
-        stroke="currentColor"
+        fill={solid ? 'var(--edit-mark-bg)' : 'none'}
+        stroke={solid ? 'var(--edit-mark)' : 'currentColor'}
         strokeWidth="1.25"
         strokeLinejoin="round"
       />
