@@ -495,15 +495,8 @@ export default function App() {
     for (const comment of comments) {
       counts.set(comment.commitSha, (counts.get(comment.commitSha) ?? 0) + 1)
     }
-    for (const [sha, edit] of Object.entries(messageEdits)) {
-      let extra = 0
-      if (edit.subject !== undefined) extra += 1
-      if (edit.body !== undefined) extra += 1
-      if (extra === 0) continue
-      counts.set(sha, (counts.get(sha) ?? 0) + extra)
-    }
     return counts
-  }, [comments, messageEdits])
+  }, [comments])
 
   const visibleCommits = useMemo(
     () =>

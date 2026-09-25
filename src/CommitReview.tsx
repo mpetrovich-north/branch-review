@@ -24,6 +24,8 @@ import type {
 import { createComment, removeComment, setCommentResolved, setReviewed, updateComment, upsertMessageEdit } from './api'
 import { buildFileTree, collectDirPaths, type FileTreeNode } from './fileTree'
 import {
+  CaretLeftIcon,
+  CaretRightIcon,
   CheckIcon,
   CheckboxIcon,
   CommentBubbleIcon,
@@ -118,6 +120,46 @@ type Props = {
 
 function fileAnchorId(path: string): string {
   return `file-diff-${encodeURIComponent(path)}`
+}
+
+function commentDomId(id: string): string {
+  return `review-comment-${id}`
+}
+
+function scrollToCommentElement(id: string) {
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(commentDomId(id))
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  })
+}
+
+/** Open file then line comments for one path, in visual order. */
+function orderedOpenCommentIdsForFile(
+  file: DiffFile,
+  fileComments: FileComment[],
+  lineComments: LineComment[],
+  showWhitespace: boolean,
+): string[] {
+  const lines = showWhitespace ? file.lines : hideWhitespaceOnlyChanges(file.lines)
+  const openFileIds = fileComments.filter((c) => !isCommentResolved(c)).map((c) => c.id)
+  const openLine = lineComments.filter((c) => !isCommentResolved(c))
+  const orderedLineIds: string[] = []
+  const seen = new Set<string>()
+  for (let i = 0; i < lines.length; i++) {
+    for (const c of openLine) {
+      if (seen.has(c.id)) continue
+      if (!isCommentAnchorRow(c, file.path, lines, i)) continue
+      orderedLineIds.push(c.id)
+      seen.add(c.id)
+    }
+  }
+  for (const c of openLine) {
+    if (!seen.has(c.id)) orderedLineIds.push(c.id)
+  }
+  return [...openFileIds, ...orderedLineIds]
 }
 
 function CommitBodyDisplay({ body }: { body: string }) {
@@ -630,6 +672,7 @@ function EditableComment({
 
   return (
     <div
+      id={commentDomId(comment.id)}
       className={threadClass}
       onMouseEnter={() => onHoverChange?.(comment.id)}
       onMouseLeave={() => onHoverChange?.(null)}
@@ -911,6 +954,13 @@ function FileDiffSection({
   onDelete,
   showWhitespace,
   onToggleShowWhitespace,
+  fileCommentIds,
+  focusCommentId,
+  canPrevComment,
+  canNextComment,
+  onPrevComment,
+  onNextComment,
+  onFirstComment,
 }: {
   file: DiffFile
   lineComments: LineComment[]
@@ -947,6 +997,13 @@ function FileDiffSection({
   onDelete: (id: string) => Promise<void>
   showWhitespace: boolean
   onToggleShowWhitespace: () => void
+  fileCommentIds: string[]
+  focusCommentId: string | null
+  canPrevComment: boolean
+  canNextComment: boolean
+  onPrevComment: () => void
+  onNextComment: () => void
+  onFirstComment: () => void
 }) {
   const displayFile = useMemo(() => {
     if (showWhitespace) return file
@@ -955,6 +1012,13 @@ function FileDiffSection({
   const highlighted: LineTokens[] | null = useHighlightedDiff(displayFile)
   const [expanded, setExpanded] = useState(true)
   const [hoveredCommentId, setHoveredCommentId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!focusCommentId || !fileCommentIds.includes(focusCommentId)) return
+    setExpanded(true)
+    scrollToCommentElement(focusCommentId)
+  }, [focusCommentId, fileCommentIds])
+
   const [lineSelect, setLineSelect] = useState<{
     path: string
     anchorIdx: number
@@ -1144,6 +1208,44 @@ function FileDiffSection({
         </div>
         <div className="diff-file-actions">
           <DiffStat {...countFileDiffStats(displayFile)} />
+          {fileCommentIds.length > 0 ? (
+            <div className="file-comment-nav">
+              <button
+                type="button"
+                className="file-comment-nav-caret"
+                title="Previous comment"
+                aria-label="Previous comment"
+                disabled={!canPrevComment}
+                onClick={onPrevComment}
+              >
+                <CaretLeftIcon />
+              </button>
+              <button
+                type="button"
+                className="file-comment-nav-count"
+                title={`Go to first of ${fileCommentIds.length} comment${
+                  fileCommentIds.length === 1 ? '' : 's'
+                }`}
+                aria-label={`Go to first of ${fileCommentIds.length} comment${
+                  fileCommentIds.length === 1 ? '' : 's'
+                }`}
+                onClick={onFirstComment}
+              >
+                <CommentBubbleIcon />
+                <span>{fileCommentIds.length}</span>
+              </button>
+              <button
+                type="button"
+                className="file-comment-nav-caret"
+                title="Next comment"
+                aria-label="Next comment"
+                disabled={!canNextComment}
+                onClick={onNextComment}
+              >
+                <CaretRightIcon />
+              </button>
+            </div>
+          ) : null}
           <button
             type="button"
             className="comment-bubble"
@@ -1506,6 +1608,129 @@ export function CommitReview({
     }
     return map
   }, [comments, commit.sha])
+
+  const commentsByFile = useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const file of files) {
+      const fileCs = comments.filter(
+        (c): c is FileComment =>
+          c.kind === 'file' && c.commitSha === commit.sha && c.path === file.path,
+      )
+      const lineCs = comments.filter(
+        (c): c is LineComment =>
+          c.kind === 'line' && c.commitSha === commit.sha && c.path === file.path,
+      )
+      map.set(
+        file.path,
+        orderedOpenCommentIdsForFile(file, fileCs, lineCs, showWhitespace),
+      )
+    }
+    return map
+  }, [files, comments, commit.sha, showWhitespace])
+
+  const orderedReviewComments = useMemo(() => {
+    const list: { id: string; path: string }[] = []
+    for (const file of files) {
+      for (const id of commentsByFile.get(file.path) ?? []) {
+        list.push({ id, path: file.path })
+      }
+    }
+    return list
+  }, [files, commentsByFile])
+
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (
+      activeCommentId &&
+      !orderedReviewComments.some((c) => c.id === activeCommentId)
+    ) {
+      setActiveCommentId(null)
+    }
+  }, [activeCommentId, orderedReviewComments])
+
+  function focusComment(id: string) {
+    setActiveCommentId(id)
+  }
+
+  function commentNavState(filePath: string) {
+    const fileIds = commentsByFile.get(filePath) ?? []
+    const activeInFile = Boolean(activeCommentId && fileIds.includes(activeCommentId))
+    const localIndex = activeInFile ? fileIds.indexOf(activeCommentId!) : -1
+
+    const fileOrder = files.map((f) => f.path)
+    const filePos = fileOrder.indexOf(filePath)
+
+    function hasCommentsBefore(): boolean {
+      for (let i = 0; i < filePos; i++) {
+        if ((commentsByFile.get(fileOrder[i]!) ?? []).length > 0) return true
+      }
+      return false
+    }
+
+    function hasCommentsAfter(): boolean {
+      for (let i = filePos + 1; i < fileOrder.length; i++) {
+        if ((commentsByFile.get(fileOrder[i]!) ?? []).length > 0) return true
+      }
+      return false
+    }
+
+    function lastCommentBefore(): string | null {
+      for (let i = filePos - 1; i >= 0; i--) {
+        const ids = commentsByFile.get(fileOrder[i]!) ?? []
+        if (ids.length > 0) return ids[ids.length - 1]!
+      }
+      return null
+    }
+
+    function firstCommentAfter(): string | null {
+      for (let i = filePos + 1; i < fileOrder.length; i++) {
+        const ids = commentsByFile.get(fileOrder[i]!) ?? []
+        if (ids.length > 0) return ids[0]!
+      }
+      return null
+    }
+
+    const canPrev = activeInFile
+      ? localIndex > 0 || hasCommentsBefore()
+      : hasCommentsBefore()
+    const canNext = activeInFile
+      ? localIndex < fileIds.length - 1 || hasCommentsAfter()
+      : fileIds.length > 0
+
+    function goPrev() {
+      if (activeInFile) {
+        if (localIndex > 0) {
+          focusComment(fileIds[localIndex - 1]!)
+          return
+        }
+        const prev = lastCommentBefore()
+        if (prev) focusComment(prev)
+        return
+      }
+      const prev = lastCommentBefore()
+      if (prev) focusComment(prev)
+    }
+
+    function goNext() {
+      if (activeInFile) {
+        if (localIndex < fileIds.length - 1) {
+          focusComment(fileIds[localIndex + 1]!)
+          return
+        }
+        const next = firstCommentAfter()
+        if (next) focusComment(next)
+        return
+      }
+      if (fileIds[0]) focusComment(fileIds[0])
+    }
+
+    function goFirst() {
+      if (fileIds[0]) focusComment(fileIds[0])
+    }
+
+    return { canPrev, canNext, goPrev, goNext, goFirst }
+  }
 
   function clearDrafts() {
     setDraftLine(null)
@@ -1945,7 +2170,10 @@ export function CommitReview({
           {files.length === 0 ? (
             <p className="empty">No files in this commit.</p>
           ) : (
-            files.map((file) => (
+            files.map((file) => {
+              const fileIds = commentsByFile.get(file.path) ?? []
+              const nav = commentNavState(file.path)
+              return (
               <FileDiffSection
                 key={`${commit.sha}:${file.path}`}
                 file={file}
@@ -1979,8 +2207,16 @@ export function CommitReview({
                 onDelete={onDelete}
                 showWhitespace={showWhitespace}
                 onToggleShowWhitespace={toggleShowWhitespace}
+                fileCommentIds={fileIds}
+                focusCommentId={activeCommentId}
+                canPrevComment={nav.canPrev}
+                canNextComment={nav.canNext}
+                onPrevComment={nav.goPrev}
+                onNextComment={nav.goNext}
+                onFirstComment={nav.goFirst}
               />
-            ))
+              )
+            })
           )}
         </div>
         <button

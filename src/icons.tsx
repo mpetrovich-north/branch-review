@@ -213,6 +213,34 @@ export function CommentBubbleIcon({
   )
 }
 
+export function CaretLeftIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M9.75 3.25 5.25 8l4.5 4.75"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
+}
+
+export function CaretRightIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M6.25 3.25 10.75 8l-4.5 4.75"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  )
+}
+
 export function EditIcon(props: IconProps) {
   return (
     <Svg {...props}>

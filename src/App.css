@@ -1747,6 +1747,72 @@ pre,
   min-width: 0;
 }
 
+.file-comment-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  flex-shrink: 0;
+  height: 1.6rem;
+  margin-left: 0.35rem;
+  padding: 0 0.15rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  box-sizing: border-box;
+}
+
+.file-comment-nav-caret,
+.file-comment-nav-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--radius) - 1px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.file-comment-nav-caret {
+  width: 1.25rem;
+  height: 1.35rem;
+}
+
+.file-comment-nav-caret svg {
+  width: 12px;
+  height: 12px;
+}
+
+.file-comment-nav-count {
+  gap: 0.25rem;
+  height: 1.35rem;
+  padding: 0 0.3rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.file-comment-nav-count svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.file-comment-nav-caret:hover:not(:disabled),
+.file-comment-nav-count:hover {
+  color: var(--accent);
+}
+
+.file-comment-nav-caret:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .diff-file-title {
   display: flex;
   align-items: center;
@@ -1827,20 +1893,21 @@ pre,
 }
 
 .unified-diff-content {
-  display: inline-grid;
+  display: inline-block;
   min-width: 100%;
-  justify-items: stretch;
+  vertical-align: top;
 }
 
 .diff-line-block {
-  width: 100%;
-  min-width: 0;
+  width: max-content;
+  min-width: 100%;
 }
 
 .diff-line {
   display: grid;
-  grid-template-columns: 2.75rem 2.75rem minmax(0, 1fr);
-  width: 100%;
+  grid-template-columns: 2.75rem 2.75rem max-content;
+  width: max-content;
+  min-width: 100%;
   box-sizing: border-box;
 }
 
@@ -1851,7 +1918,7 @@ pre,
   text-align: right;
   padding: 0.05rem 0.4rem;
   user-select: none;
-  background: transparent;
+  background: var(--surface);
   box-sizing: border-box;
 }
 
@@ -1882,19 +1949,20 @@ pre,
   color: var(--muted);
 }
 .diff-line.meta .gutter {
-  background: transparent;
+  background: var(--surface);
 }
 
 .line-body {
   display: block;
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border: 0;
   background: transparent;
   text-align: left;
   padding: 0.1rem 0.5rem;
   cursor: pointer;
-  min-width: 0;
   color: inherit;
+  box-sizing: border-box;
 }
 
 .line-body:disabled {
@@ -1933,10 +2001,12 @@ pre,
   background: color-mix(in srgb, var(--danger) 20%, var(--removed-bg));
 }
 
-.diff-line.is-line-hover,
-.diff-line.is-line-hover .gutter,
 .diff-line.is-line-hover .line-body {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.diff-line.is-line-hover .gutter {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
 }
 
 .diff-line.added.is-line-hover,
@@ -1996,10 +2066,14 @@ pre,
 
 .comment-thread.inline {
   margin: 0.5rem 0.75rem 0.55rem 5.5rem;
+  box-sizing: border-box;
+  max-width: min(40rem, calc(100vw - 8rem));
 }
 
 .comment-thread.file-level {
   margin: 0.65rem 0.85rem;
+  box-sizing: border-box;
+  max-width: min(40rem, calc(100vw - 4rem));
 }
 
 .comment-edit-overlay {
@@ -2019,12 +2093,16 @@ pre,
 
 .comment-compose.inline .compose-panel {
   left: 5.5rem;
-  right: 0.75rem;
+  right: auto;
+  width: min(40rem, calc(100vw - 8rem));
+  box-sizing: border-box;
 }
 
 .comment-compose.file-level .compose-panel {
   left: 0.85rem;
-  right: 0.85rem;
+  right: auto;
+  width: min(40rem, calc(100vw - 4rem));
+  box-sizing: border-box;
 }
 
 .comment-compose .compose-panel {
