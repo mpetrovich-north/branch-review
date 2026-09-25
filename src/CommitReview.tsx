@@ -719,11 +719,39 @@ function FileDiffSection({
   onDelete: (id: string) => Promise<void>
 }) {
   const highlighted: LineTokens[] | null = useHighlightedDiff(file)
+  const [expanded, setExpanded] = useState(true)
 
   return (
-    <section id={fileAnchorId(file.path)} className="diff-file" data-file-path={file.path}>
+    <section
+      id={fileAnchorId(file.path)}
+      className={`diff-file${expanded ? '' : ' is-collapsed'}`}
+      data-file-path={file.path}
+    >
       <div className="diff-file-header">
         <div className="diff-file-title">
+          <button
+            type="button"
+            className="diff-file-toggle"
+            aria-expanded={expanded}
+            aria-label={expanded ? 'Collapse file' : 'Expand file'}
+            title={expanded ? 'Collapse file' : 'Expand file'}
+            onClick={() => setExpanded((prev) => !prev)}
+          >
+            <svg
+              className={`diff-file-toggle-icon${expanded ? '' : ' is-collapsed'}`}
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+            >
+              <path
+                d="M6.5 3.25 11 8l-4.5 4.75"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
           <span className={`status status-${file.status}`}>
             <StatusIcon status={file.status} />
           </span>
@@ -744,123 +772,127 @@ function FileDiffSection({
           </button>
         </div>
       </div>
-      {fileComments.map((c) => (
-        <EditableComment
-          key={c.id}
-          comment={c}
-          busy={busy}
-          onSave={onEdit}
-          onResolve={onResolve}
-          onDelete={onDelete}
-          className="file-level"
-        />
-      ))}
-      {draftFilePath === file.path ? (
-        <div className="comment-compose file-level">
-          <div className="compose-panel">
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Comment on this file"
-              rows={3}
-              autoFocus
-              onKeyDown={(e) => {
-                if (!isSaveShortcut(e)) return
-                e.preventDefault()
-                if (!busy) onSubmitFile()
-              }}
-            />
-            <DraftActions
+      {expanded ? (
+        <>
+          {fileComments.map((c) => (
+            <EditableComment
+              key={c.id}
+              comment={c}
               busy={busy}
-              saveDisabled={!body.trim()}
-              onSave={onSubmitFile}
-              onCancel={onClearDrafts}
+              onSave={onEdit}
+              onResolve={onResolve}
+              onDelete={onDelete}
+              className="file-level"
             />
-          </div>
-        </div>
-      ) : null}
-      <div className="unified-diff">
-        <div className="unified-diff-content">
-          {file.lines.map((line, idx) => {
-            if (line.type === 'meta') {
-              return (
-                <div key={idx} className="diff-line meta">
-                  <span className="gutter gutter-old" />
-                  <span className="gutter gutter-new" />
-                  <pre className="line-code">{line.content}</pre>
-                </div>
-              )
-            }
-
-            const lineNo = lineNumberFor(line)
-            const related = lineComments.filter((c) => matchesLineComment(c, file.path, line))
-            const canComment = lineNo !== null
-
-            return (
-              <div key={idx} className="diff-line-block">
-                <div className={`diff-line ${line.type}`}>
-                  <span className="gutter gutter-old">{line.oldLine ?? ''}</span>
-                  <span className="gutter gutter-new">{line.newLine ?? ''}</span>
-                  <button
-                    type="button"
-                    className="line-body"
-                    disabled={!canComment}
-                    onClick={() => {
-                      if (lineNo === null || line.type === 'meta') return
-                      onStartLineComment({
-                        path: file.path,
-                        line: lineNo,
-                        lineType: line.type,
-                        snippet: line.content,
-                      })
-                    }}
-                  >
-                    <LineCode content={line.content} tokens={highlighted?.[idx]} />
-                  </button>
-                </div>
-                {related.map((c) => (
-                  <EditableComment
-                    key={c.id}
-                    comment={c}
-                    busy={busy}
-                    onSave={onEdit}
-                    onResolve={onResolve}
-                    onDelete={onDelete}
-                    className="inline"
-                  />
-                ))}
-                {draftLine &&
-                draftLine.path === file.path &&
-                draftLine.line === lineNo &&
-                draftLine.lineType === line.type ? (
-                  <div className="comment-compose inline">
-                    <div className="compose-panel">
-                      <textarea
-                        value={body}
-                        onChange={(e) => setBody(e.target.value)}
-                        placeholder="Comment on this line"
-                        rows={3}
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (!isSaveShortcut(e)) return
-                          e.preventDefault()
-                          if (!busy) onSubmitLine()
-                        }}
-                      />
-                      <DraftActions
-                        busy={busy}
-                        saveDisabled={!body.trim()}
-                        onSave={onSubmitLine}
-                        onCancel={onClearDrafts}
-                      />
-                    </div>
-                  </div>
-                ) : null}
+          ))}
+          {draftFilePath === file.path ? (
+            <div className="comment-compose file-level">
+              <div className="compose-panel">
+                <textarea
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder="Comment on this file"
+                  rows={3}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (!isSaveShortcut(e)) return
+                    e.preventDefault()
+                    if (!busy) onSubmitFile()
+                  }}
+                />
+                <DraftActions
+                  busy={busy}
+                  saveDisabled={!body.trim()}
+                  onSave={onSubmitFile}
+                  onCancel={onClearDrafts}
+                />
               </div>
-            )
-          })}
-        </div>
-      </div>
+            </div>
+          ) : null}
+          <div className="unified-diff">
+            <div className="unified-diff-content">
+              {file.lines.map((line, idx) => {
+                if (line.type === 'meta') {
+                  return (
+                    <div key={idx} className="diff-line meta">
+                      <span className="gutter gutter-old" />
+                      <span className="gutter gutter-new" />
+                      <pre className="line-code">{line.content}</pre>
+                    </div>
+                  )
+                }
+
+                const lineNo = lineNumberFor(line)
+                const related = lineComments.filter((c) => matchesLineComment(c, file.path, line))
+                const canComment = lineNo !== null
+
+                return (
+                  <div key={idx} className="diff-line-block">
+                    <div className={`diff-line ${line.type}`}>
+                      <span className="gutter gutter-old">{line.oldLine ?? ''}</span>
+                      <span className="gutter gutter-new">{line.newLine ?? ''}</span>
+                      <button
+                        type="button"
+                        className="line-body"
+                        disabled={!canComment}
+                        onClick={() => {
+                          if (lineNo === null || line.type === 'meta') return
+                          onStartLineComment({
+                            path: file.path,
+                            line: lineNo,
+                            lineType: line.type,
+                            snippet: line.content,
+                          })
+                        }}
+                      >
+                        <LineCode content={line.content} tokens={highlighted?.[idx]} />
+                      </button>
+                    </div>
+                    {related.map((c) => (
+                      <EditableComment
+                        key={c.id}
+                        comment={c}
+                        busy={busy}
+                        onSave={onEdit}
+                        onResolve={onResolve}
+                        onDelete={onDelete}
+                        className="inline"
+                      />
+                    ))}
+                    {draftLine &&
+                    draftLine.path === file.path &&
+                    draftLine.line === lineNo &&
+                    draftLine.lineType === line.type ? (
+                      <div className="comment-compose inline">
+                        <div className="compose-panel">
+                          <textarea
+                            value={body}
+                            onChange={(e) => setBody(e.target.value)}
+                            placeholder="Comment on this line"
+                            rows={3}
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (!isSaveShortcut(e)) return
+                              e.preventDefault()
+                              if (!busy) onSubmitLine()
+                            }}
+                          />
+                          <DraftActions
+                            busy={busy}
+                            saveDisabled={!body.trim()}
+                            onSave={onSubmitLine}
+                            onCancel={onClearDrafts}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      ) : null}
     </section>
   )
 }
@@ -966,17 +998,6 @@ export function CommitReview({
   }
 
   function onFileListChipClick() {
-    if (fileListCollapsed) {
-      setFileListCollapsed(false)
-      setFileListScrollHidden(false)
-      return
-    }
-    // Expanded but faded: bring the pane back.
-    if (fileListScrollHidden) setFileListScrollHidden(false)
-  }
-
-  function onFileListChipToggleClick(event: MouseEvent<HTMLButtonElement>) {
-    event.stopPropagation()
     // Pane is faded: first click restores it (chip looks collapsed while faded).
     if (!fileListCollapsed && fileListScrollHidden) {
       setFileListScrollHidden(false)
@@ -1475,7 +1496,7 @@ export function CommitReview({
           ) : (
             files.map((file) => (
               <FileDiffSection
-                key={file.path}
+                key={`${commit.sha}:${file.path}`}
                 file={file}
                 lineComments={lineComments.filter((c) => c.path === file.path)}
                 fileComments={comments.filter(
@@ -1509,22 +1530,19 @@ export function CommitReview({
             ))
           )}
         </div>
-        <aside
+        <button
+          type="button"
           className="file-list-chip"
+          aria-expanded={!fileListCollapsed && !fileListScrollHidden}
+          aria-label={chipCaretCollapsed ? 'Expand file list' : 'Collapse file list'}
+          title={chipCaretCollapsed ? 'Expand file list' : 'Collapse file list'}
           onClick={onFileListChipClick}
         >
           <div className="file-list-heading">
             <h3>
               {files.length} {files.length === 1 ? 'file' : 'files'}
             </h3>
-            <button
-              type="button"
-              className="file-list-toggle"
-              aria-expanded={!fileListCollapsed && !fileListScrollHidden}
-              aria-label={chipCaretCollapsed ? 'Expand file list' : 'Collapse file list'}
-              title={chipCaretCollapsed ? 'Expand file list' : 'Collapse file list'}
-              onClick={onFileListChipToggleClick}
-            >
+            <span className="file-list-toggle" aria-hidden="true">
               <svg
                 className={`file-list-toggle-icon${chipCaretCollapsed ? ' is-collapsed' : ''}`}
                 viewBox="0 0 16 16"
@@ -1539,9 +1557,9 @@ export function CommitReview({
                   strokeLinejoin="round"
                 />
               </svg>
-            </button>
+            </span>
           </div>
-        </aside>
+        </button>
         {!fileListCollapsed ? (
           <aside
             className={`file-list${fileListScrollHidden ? ' is-scroll-hidden' : ''}`}

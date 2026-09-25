@@ -62,6 +62,11 @@ async function resolveCommitish(repoPath: string, name: string): Promise<string>
   }
 }
 
+export type DiffStatCounts = {
+  added: number
+  removed: number
+}
+
 export type CommitSummary = {
   sha: string
   shortSha: string
@@ -71,6 +76,42 @@ export type CommitSummary = {
   authorEmail: string
   authoredAt: string
   isMerge: boolean
+  stats: DiffStatCounts
+}
+
+function parseNumstatLines(lines: string[]): DiffStatCounts {
+  let added = 0
+  let removed = 0
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    const [addRaw, delRaw] = trimmed.split('\t')
+    if (addRaw && addRaw !== '-') added += Number(addRaw)
+    if (delRaw && delRaw !== '-') removed += Number(delRaw)
+  }
+  return { added, removed }
+}
+
+async function listCommitStatsBySha(
+  repoPath: string,
+  baseSha: string,
+  reviewSha: string,
+): Promise<Map<string, DiffStatCounts>> {
+  const stdout = await git(repoPath, [
+    'log',
+    '--reverse',
+    '--numstat',
+    '--format=%x1e%H',
+    `${baseSha}..${reviewSha}`,
+  ])
+  const map = new Map<string, DiffStatCounts>()
+  for (const chunk of stdout.split('\x1e')) {
+    const lines = chunk.split('\n').map((l) => l.trim()).filter(Boolean)
+    if (lines.length === 0) continue
+    const sha = lines[0]!
+    map.set(sha, parseNumstatLines(lines.slice(1)))
+  }
+  return map
 }
 
 export async function listCommitsNotInBase(
@@ -81,11 +122,14 @@ export async function listCommitsNotInBase(
   const baseSha = await resolveCommitish(repoPath, baseBranch)
   const reviewSha = await resolveCommitish(repoPath, reviewBranch)
   const format = ['%H', '%h', '%s', '%b', '%an', '%ae', '%aI', '%P'].join('%x1f') + '%x1e'
-  const stdout = await git(repoPath, [
-    'log',
-    '--reverse',
-    `--format=${format}`,
-    `${baseSha}..${reviewSha}`,
+  const [stdout, statsBySha] = await Promise.all([
+    git(repoPath, [
+      'log',
+      '--reverse',
+      `--format=${format}`,
+      `${baseSha}..${reviewSha}`,
+    ]),
+    listCommitStatsBySha(repoPath, baseSha, reviewSha),
   ])
 
   const records = stdout.split('\x1e').map((r) => r.trim()).filter(Boolean)
@@ -102,6 +146,7 @@ export async function listCommitsNotInBase(
       authorEmail,
       authoredAt,
       isMerge: parentCount > 1,
+      stats: statsBySha.get(sha!) ?? { added: 0, removed: 0 },
     }
   })
 }
@@ -133,11 +178,6 @@ export async function getCommitDiff(repoPath: string, sha: string): Promise<Diff
   return parseUnifiedDiff(stdout)
 }
 
-export type DiffStatCounts = {
-  added: number
-  removed: number
-}
-
 /** Net line adds/removes for review tip vs base (three-dot range). */
 export async function getRangeDiffStat(
   repoPath: string,
@@ -147,16 +187,7 @@ export async function getRangeDiffStat(
   const baseSha = await resolveCommitish(repoPath, baseBranch)
   const reviewSha = await resolveCommitish(repoPath, reviewBranch)
   const stdout = await git(repoPath, ['diff', '--numstat', `${baseSha}...${reviewSha}`])
-  let added = 0
-  let removed = 0
-  for (const line of stdout.split('\n')) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    const [addRaw, delRaw] = trimmed.split('\t')
-    if (addRaw && addRaw !== '-') added += Number(addRaw)
-    if (delRaw && delRaw !== '-') removed += Number(delRaw)
-  }
-  return { added, removed }
+  return parseNumstatLines(stdout.split('\n'))
 }
 
 export function parseUnifiedDiff(diffText: string): DiffFile[] {

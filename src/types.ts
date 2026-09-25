@@ -71,6 +71,7 @@ export type CommitSummary = {
   authorEmail: string
   authoredAt: string
   isMerge: boolean
+  stats: DiffStatCounts
 }
 
 export type DiffStatCounts = {

@@ -722,7 +722,15 @@ export default function App() {
                     <h2 className="commit-list-branch-name" title={reviewDraft}>
                       {reviewDraft}
                     </h2>
-                    {branchStats ? <DiffStat {...branchStats} /> : null}
+                    <div className="commit-list-branch-meta">
+                      <p
+                        className="commit-list-branch-vs"
+                        title={`vs. ${baseDraft.trim()}`}
+                      >
+                        vs. {baseDraft.trim()}
+                      </p>
+                      {branchStats ? <DiffStat {...branchStats} /> : null}
+                    </div>
                   </div>
                   {commits.length === 0 ? (
                     <p className="empty">No commits ahead of the base branch.</p>
@@ -806,7 +814,10 @@ export default function App() {
                                     <span className="subject">
                                       {messageEdits[c.sha]?.subject ?? c.subject}
                                     </span>
-                                    <code className="sha">{c.shortSha}</code>
+                                    <span className="sha-row">
+                                      <code className="sha">{c.shortSha}</code>
+                                      <DiffStat {...c.stats} />
+                                    </span>
                                   </button>
                                 </li>
                               )
