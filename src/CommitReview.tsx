@@ -1536,7 +1536,7 @@ export function CommitReview({
   const fileListWidthFloorRef = useRef(0)
   const fileListWidthShaRef = useRef(commit.sha)
   const [fileListWidth, setFileListWidth] = useState(0)
-  const [fileListCollapsed, setFileListCollapsed] = useState(false)
+  const [fileListCollapsed, setFileListCollapsed] = useState(true)
   const [fileListScrollHidden, setFileListScrollHidden] = useState(false)
   const [showWhitespace, setShowWhitespace] = useState(readStoredShowWhitespace)
   const fileListCollapsedRef = useRef(fileListCollapsed)
@@ -1789,8 +1789,8 @@ export function CommitReview({
     clearDrafts()
     setExpandedDirs(new Set(collectDirPaths(fileTree)))
     setNameHover(null)
-    setFileListCollapsed(false)
-    setFileListScrollHidden(window.scrollY > 8)
+    setFileListCollapsed(true)
+    setFileListScrollHidden(false)
   }, [commit.sha, files, fileTree, initialFilePath])
 
   // Grow the floating file list to fit visible labels; never shrink on collapse.
