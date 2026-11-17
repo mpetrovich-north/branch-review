@@ -33,6 +33,11 @@ export async function assertGitRepo(repoPath: string): Promise<void> {
   }
 }
 
+/** Absolute path of the git work tree that contains `repoPath`. */
+export async function resolveGitToplevel(repoPath: string): Promise<string> {
+  return (await git(repoPath, ['rev-parse', '--show-toplevel'])).trim()
+}
+
 /** Branch checked out on disk, or null when HEAD is detached. */
 export async function getCheckedOutBranch(repoPath: string): Promise<string | null> {
   const out = await git(repoPath, ['branch', '--show-current'])

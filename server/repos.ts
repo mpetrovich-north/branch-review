@@ -1,6 +1,6 @@
 import { access, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { assertGitRepo } from './git.js'
+import { assertGitRepo, resolveGitToplevel } from './git.js'
 
 export type RepoInfo = {
   path: string
@@ -37,17 +37,18 @@ export async function assertScanRoot(dir: string): Promise<string> {
   return resolved
 }
 
+/**
+ * True only when `dir` itself is a git work tree root (has a `.git` file or
+ * directory). Do not use `git rev-parse --is-inside-work-tree`: that is true for
+ * every subdirectory of a repo, which made nested folders like `design/` and
+ * `src/` show up as separate repos and steal the alphabetical default.
+ */
 async function isGitWorkTree(dir: string): Promise<boolean> {
   try {
     await access(path.join(dir, '.git'))
     return true
   } catch {
-    try {
-      await assertGitRepo(dir)
-      return true
-    } catch {
-      return false
-    }
+    return false
   }
 }
 
@@ -93,5 +94,12 @@ export async function assertAllowedRepo(repoPath: string, roots: string[]): Prom
     throw new Error(`Repo path is not under an allowed root: ${resolved}`)
   }
   await assertGitRepo(resolved)
-  return resolved
+  // Map nested paths (and stale localStorage entries) to the real work tree root
+  // so comments land in `<repo>/.branch-review/`, not a child folder.
+  const toplevel = path.resolve(await resolveGitToplevel(resolved))
+  const toplevelAllowed = roots.some((root) => isPathInsideRoot(toplevel, root))
+  if (!toplevelAllowed) {
+    throw new Error(`Repo path is not under an allowed root: ${toplevel}`)
+  }
+  return toplevel
 }
