@@ -34,7 +34,13 @@ import { pickDirectory } from './pick-directory.js'
 import { configSchema } from './schema.js'
 
 const initialScan = parseScanRoot()
+/** Roots used for the repo dropdown / scan listing (last tab that set them). */
 let roots = [initialScan.root]
+/**
+ * Union of every scan root seen this process. Keeps other tabs' repos allowed
+ * when one tab changes directory (roots is replaced for listing only).
+ */
+let allowedRoots = [initialScan.root]
 let fromCli = initialScan.fromCli
 const port = Number(process.env.PORT ?? 8787)
 
@@ -50,6 +56,18 @@ function asyncHandler(
   }
 }
 
+function rememberAllowedRoots(next: string[]): void {
+  for (const root of next) {
+    if (!allowedRoots.includes(root)) allowedRoots.push(root)
+  }
+}
+
+async function setScanRoots(raw: string[]): Promise<void> {
+  const next = await Promise.all(raw.map((r) => assertScanRoot(String(r))))
+  roots = next
+  rememberAllowedRoots(next)
+}
+
 async function resolveRepo(req: express.Request): Promise<string> {
   const raw = req.header('x-repo-path') ?? req.query.repo
   if (raw == null || String(raw).trim() === '') {
@@ -58,7 +76,7 @@ async function resolveRepo(req: express.Request): Promise<string> {
     })
   }
   try {
-    return await assertAllowedRepo(String(raw), roots)
+    return await assertAllowedRepo(String(raw), allowedRoots)
   } catch (error) {
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
       status: 400,
@@ -72,6 +90,7 @@ app.get(
     res.json({
       ok: true,
       roots,
+      allowedRoots,
       fromCli,
     })
   }),
@@ -101,7 +120,7 @@ app.put(
         status: 400,
       })
     }
-    roots = await Promise.all(raw.map((r) => assertScanRoot(String(r))))
+    await setScanRoots(raw.map(String))
     fromCli = false
     await respondWithRepos(res)
   }),
@@ -115,7 +134,7 @@ app.post(
       await respondWithRepos(res, { cancelled: true })
       return
     }
-    roots = [await assertScanRoot(chosen)]
+    await setScanRoots([chosen])
     fromCli = false
     await respondWithRepos(res, { cancelled: false })
   }),
@@ -362,7 +381,7 @@ app.use(
 
 async function main() {
   try {
-    roots = [await assertScanRoot(initialScan.root)]
+    await setScanRoots([initialScan.root])
   } catch (error) {
     console.error(error instanceof Error ? error.message : error)
     process.exit(1)

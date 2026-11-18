@@ -35,30 +35,26 @@ export function getActiveRepoPath(): string | null {
   return activeRepoPath
 }
 
-/** Per-tab repo in sessionStorage; localStorage only seeds brand-new tabs. */
+/** Per-tab only — never localStorage, which is shared across tabs. */
 export function setActiveRepoPath(repoPath: string | null): void {
   activeRepoPath = repoPath
   writeStorage(sessionStorage, REPO_STORAGE_KEY, repoPath)
-  if (repoPath) writeStorage(localStorage, REPO_STORAGE_KEY, repoPath)
+  // Drop the old shared key so a refresh cannot adopt another tab's repo.
+  writeStorage(localStorage, REPO_STORAGE_KEY, null)
 }
 
 export function readStoredRepoPath(): string | null {
-  return (
-    readStorage(sessionStorage, REPO_STORAGE_KEY) ??
-    readStorage(localStorage, REPO_STORAGE_KEY)
-  )
+  return readStorage(sessionStorage, REPO_STORAGE_KEY)
 }
 
+/** Per-tab scan root — localStorage was shared and made other tabs adopt this tab's directory. */
 export function readStoredRepoRoot(): string | null {
-  return localStorage.getItem(REPO_ROOT_STORAGE_KEY)
+  return readStorage(sessionStorage, REPO_ROOT_STORAGE_KEY)
 }
 
 export function setStoredRepoRoot(root: string | null): void {
-  if (root) {
-    localStorage.setItem(REPO_ROOT_STORAGE_KEY, root)
-  } else {
-    localStorage.removeItem(REPO_ROOT_STORAGE_KEY)
-  }
+  writeStorage(sessionStorage, REPO_ROOT_STORAGE_KEY, root)
+  writeStorage(localStorage, REPO_ROOT_STORAGE_KEY, null)
 }
 
 function withRepo(url: string): string {
@@ -98,25 +94,70 @@ export type RepoListResponse = {
   cancelled?: boolean
 }
 
+function repoPathFromBrowser(): string | null {
+  try {
+    const value = new URLSearchParams(window.location.search).get('repo')
+    return value && value.trim() ? value.trim() : null
+  } catch {
+    return null
+  }
+}
+
+/** Candidate scan roots so this tab can see `repoPath` again after another tab changed directory. */
+function scanRootsForRepo(repoPath: string): string[] {
+  const trimmed = repoPath.replace(/\/+$/, '')
+  const parent = trimmed.split('/').slice(0, -1).join('/')
+  const out: string[] = []
+  if (parent) out.push(parent)
+  out.push(trimmed)
+  return out
+}
+
+async function restoreRepoRoot(root: string): Promise<RepoListResponse | null> {
+  try {
+    const restored = await request<RepoListResponse>('/api/repo-roots', {
+      method: 'PUT',
+      body: JSON.stringify({ roots: [root] }),
+    })
+    if (restored.roots[0]) setStoredRepoRoot(restored.roots[0])
+    return restored
+  } catch {
+    return null
+  }
+}
+
 export async function fetchRepos() {
   const listed = await request<RepoListResponse>('/api/repos')
   if (listed.fromCli) {
     if (listed.roots[0]) setStoredRepoRoot(listed.roots[0])
     return listed
   }
-  const storedRoot = readStoredRepoRoot()
-  if (storedRoot) {
-    try {
-      const restored = await request<RepoListResponse>('/api/repo-roots', {
-        method: 'PUT',
-        body: JSON.stringify({ roots: [storedRoot] }),
-      })
-      if (restored.roots[0]) setStoredRepoRoot(restored.roots[0])
+
+  const wantedRepo = repoPathFromBrowser() ?? readStoredRepoPath()
+  const rootsToTry = [
+    readStoredRepoRoot(),
+    ...(wantedRepo ? scanRootsForRepo(wantedRepo) : []),
+  ].filter((r, i, all): r is string => Boolean(r) && all.indexOf(r) === i)
+
+  for (const root of rootsToTry) {
+    const hasWanted =
+      !wantedRepo || listed.repos.some((r) => r.path === wantedRepo)
+    // Reuse the first GET when it already matches this tab; otherwise restore.
+    if (root === listed.roots[0]) {
+      if (hasWanted) {
+        setStoredRepoRoot(root)
+        return listed
+      }
+      continue
+    }
+    const restored = await restoreRepoRoot(root)
+    if (!restored) continue
+    if (!wantedRepo || restored.repos.some((r) => r.path === wantedRepo)) {
       return restored
-    } catch {
-      setStoredRepoRoot(null)
     }
   }
+
+  if (rootsToTry.length > 0) setStoredRepoRoot(null)
   return listed
 }
 

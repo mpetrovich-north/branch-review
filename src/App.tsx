@@ -45,11 +45,12 @@ function configIsReady(
   return Boolean(config?.baseBranch && config.reviewBranch)
 }
 
-/** True when the view URL's repo segment refers to `repoPath`. */
+/** True when the view URL refers to `repoPath`. */
 function viewUrlMatchesRepo(
-  url: { repoName: string | null },
+  url: { repoName: string | null; repoPath: string | null },
   repoPath: string,
 ): boolean {
+  if (url.repoPath && url.repoPath === repoPath) return true
   if (!url.repoName) return false
   if (url.repoName === repoPath) return true
   const base = repoPath.replace(/\/+$/, '').split('/').pop()
@@ -114,18 +115,19 @@ function BranchOptionGroups({
 
 function pickInitialRepo(repos: RepoInfo[]): string | null {
   const url = parseViewUrl()
-  // Full path in `?repo=` is per-tab and wins over basename / shared storage.
-  if (url.repoPath && repos.some((r) => r.path === url.repoPath)) {
-    return url.repoPath
-  }
+  const inList = (path: string | null | undefined) =>
+    Boolean(path && repos.some((r) => r.path === path))
+
+  // Prefer tab-local sources: URL ?repo=, then sessionStorage, then basename.
+  if (inList(url.repoPath)) return url.repoPath
+  const stored = readStoredRepoPath()
+  if (inList(stored)) return stored
   if (url.repoName) {
     const byName = repos.find((r) => r.name === url.repoName)
     if (byName) return byName.path
     const byPath = repos.find((r) => r.path === url.repoName)
     if (byPath) return byPath.path
   }
-  const stored = readStoredRepoPath()
-  if (stored && repos.some((r) => r.path === stored)) return stored
   return repos[0]?.path ?? null
 }
 
@@ -219,6 +221,8 @@ export default function App() {
 
   const loadRepo = useCallback(
     async (nextRepo: string) => {
+      // Snapshot before state updates rewrite the address bar mid-load.
+      const url = parseViewUrl()
       setActiveRepoPath(nextRepo)
       setRepoPath(nextRepo)
       hydrated.current = false
@@ -238,7 +242,6 @@ export default function App() {
 
       const m = await fetchMeta()
       setMeta(m)
-      const url = parseViewUrl()
       const urlForThisRepo = viewUrlMatchesRepo(url, nextRepo)
       const urlBranchesOk =
         urlForThisRepo &&
@@ -428,7 +431,7 @@ export default function App() {
   }, [repos, repoPath, commits, loadRepo])
 
   useEffect(() => {
-    if (!hydrated.current || !repoPath) return
+    if (!repoPath) return
     const repo = repos.find((r) => r.path === repoPath)
     if (!repo) return
     const review = reviewDraft.trim()

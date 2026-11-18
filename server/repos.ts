@@ -23,16 +23,20 @@ export function parseScanRoot(): { root: string; fromCli: boolean } {
   return { root: inferenceCwd(), fromCli: false }
 }
 
+function badScanRoot(message: string): Error {
+  return Object.assign(new Error(message), { status: 400 })
+}
+
 export async function assertScanRoot(dir: string): Promise<string> {
   const resolved = path.resolve(dir)
   let info
   try {
     info = await stat(resolved)
   } catch {
-    throw new Error(`Directory does not exist: ${resolved}`)
+    throw badScanRoot(`Directory does not exist: ${resolved}`)
   }
   if (!info.isDirectory()) {
-    throw new Error(`Not a directory: ${resolved}`)
+    throw badScanRoot(`Not a directory: ${resolved}`)
   }
   return resolved
 }
