@@ -14,21 +14,39 @@ const REPO_ROOT_STORAGE_KEY = 'branch-review.repoRoot'
 
 let activeRepoPath: string | null = null
 
+function readStorage(storage: Storage, key: string): string | null {
+  try {
+    return storage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function writeStorage(storage: Storage, key: string, value: string | null): void {
+  try {
+    if (value) storage.setItem(key, value)
+    else storage.removeItem(key)
+  } catch {
+    /* ignore quota / private-mode failures */
+  }
+}
+
 export function getActiveRepoPath(): string | null {
   return activeRepoPath
 }
 
+/** Per-tab repo in sessionStorage; localStorage only seeds brand-new tabs. */
 export function setActiveRepoPath(repoPath: string | null): void {
   activeRepoPath = repoPath
-  if (repoPath) {
-    localStorage.setItem(REPO_STORAGE_KEY, repoPath)
-  } else {
-    localStorage.removeItem(REPO_STORAGE_KEY)
-  }
+  writeStorage(sessionStorage, REPO_STORAGE_KEY, repoPath)
+  if (repoPath) writeStorage(localStorage, REPO_STORAGE_KEY, repoPath)
 }
 
 export function readStoredRepoPath(): string | null {
-  return localStorage.getItem(REPO_STORAGE_KEY)
+  return (
+    readStorage(sessionStorage, REPO_STORAGE_KEY) ??
+    readStorage(localStorage, REPO_STORAGE_KEY)
+  )
 }
 
 export function readStoredRepoRoot(): string | null {

@@ -112,23 +112,20 @@ function BranchOptionGroups({
   )
 }
 
-function repoFromQuery(): string | null {
-  const value = new URLSearchParams(window.location.search).get('repo')
-  return value && value.trim() ? value.trim() : null
-}
-
 function pickInitialRepo(repos: RepoInfo[]): string | null {
   const url = parseViewUrl()
+  // Full path in `?repo=` is per-tab and wins over basename / shared storage.
+  if (url.repoPath && repos.some((r) => r.path === url.repoPath)) {
+    return url.repoPath
+  }
   if (url.repoName) {
     const byName = repos.find((r) => r.name === url.repoName)
     if (byName) return byName.path
     const byPath = repos.find((r) => r.path === url.repoName)
     if (byPath) return byPath.path
   }
-  const candidates = [repoFromQuery(), readStoredRepoPath()]
-  for (const candidate of candidates) {
-    if (candidate && repos.some((r) => r.path === candidate)) return candidate
-  }
+  const stored = readStoredRepoPath()
+  if (stored && repos.some((r) => r.path === stored)) return stored
   return repos[0]?.path ?? null
 }
 
@@ -405,10 +402,13 @@ export default function App() {
       setSeedFilePath(url.filePath)
       setActiveFilePath(url.filePath)
 
-      if (url.repoName && repos.length > 0) {
+      if (repos.length > 0) {
         const match =
-          repos.find((r) => r.name === url.repoName) ??
-          repos.find((r) => r.path === url.repoName)
+          (url.repoPath ? repos.find((r) => r.path === url.repoPath) : undefined) ??
+          (url.repoName
+            ? (repos.find((r) => r.name === url.repoName) ??
+              repos.find((r) => r.path === url.repoName))
+            : undefined)
         if (match && match.path !== repoPath) {
           void loadRepo(match.path).catch((e) => {
             setError(e instanceof Error ? e.message : 'Failed to switch repo')
@@ -435,6 +435,7 @@ export default function App() {
     const base = baseDraft.trim()
     replaceViewUrl({
       repoName: repo.name,
+      repoPath,
       reviewBranch: review || null,
       baseBranch: base || null,
       commitSha: selectedSha,

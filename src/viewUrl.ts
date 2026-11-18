@@ -1,5 +1,7 @@
 export type ViewUrlState = {
   repoName: string | null
+  /** Absolute repo path from `?repo=` when present (per-tab, survives refresh). */
+  repoPath: string | null
   reviewBranch: string | null
   baseBranch: string | null
   commitSha: string | null
@@ -10,12 +12,15 @@ const BRANCH_SEP = '...'
 
 export function parseViewUrl(
   pathname = window.location.pathname,
+  search = window.location.search,
   hash = window.location.hash,
 ): ViewUrlState {
+  const repoPath = repoPathFromSearch(search)
   const trimmed = pathname.replace(/^\/+|\/+$/g, '')
   if (!trimmed) {
     return {
       repoName: null,
+      repoPath,
       reviewBranch: null,
       baseBranch: null,
       commitSha: null,
@@ -28,6 +33,7 @@ export function parseViewUrl(
   if (parts.length === 1) {
     return {
       repoName,
+      repoPath,
       reviewBranch: null,
       baseBranch: null,
       commitSha: null,
@@ -46,6 +52,7 @@ export function parseViewUrl(
   if (sepAt === -1) {
     return {
       repoName,
+      repoPath,
       reviewBranch: null,
       baseBranch: null,
       commitSha,
@@ -55,6 +62,7 @@ export function parseViewUrl(
 
   return {
     repoName,
+    repoPath,
     reviewBranch: safeDecode(branchPart.slice(0, sepAt)),
     baseBranch: safeDecode(branchPart.slice(sepAt + BRANCH_SEP.length)),
     commitSha,
@@ -64,18 +72,22 @@ export function parseViewUrl(
 
 export function buildViewUrl(state: {
   repoName: string
+  repoPath?: string | null
   reviewBranch?: string | null
   baseBranch?: string | null
   commitSha?: string | null
   filePath?: string | null
 }): string {
-  const { repoName, reviewBranch, baseBranch, commitSha, filePath } = state
+  const { repoName, repoPath, reviewBranch, baseBranch, commitSha, filePath } = state
   let path = `/${encodeURIComponent(repoName)}`
   if (reviewBranch && baseBranch) {
     path += `/${encodeURIComponent(reviewBranch)}${BRANCH_SEP}${encodeURIComponent(baseBranch)}`
     if (commitSha) {
       path += `/${encodeURIComponent(commitSha)}`
     }
+  }
+  if (repoPath) {
+    path += `?repo=${encodeURIComponent(repoPath)}`
   }
   if (filePath && commitSha && reviewBranch && baseBranch) {
     path += `#${encodeURIComponent(filePath)}`
@@ -85,15 +97,21 @@ export function buildViewUrl(state: {
 
 export function replaceViewUrl(state: {
   repoName: string
+  repoPath?: string | null
   reviewBranch?: string | null
   baseBranch?: string | null
   commitSha?: string | null
   filePath?: string | null
 }): void {
   const next = buildViewUrl(state)
-  const current = `${window.location.pathname}${window.location.hash}`
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
   if (current === next) return
   window.history.replaceState(null, '', next)
+}
+
+function repoPathFromSearch(search: string): string | null {
+  const value = new URLSearchParams(search).get('repo')
+  return value && value.trim() ? value.trim() : null
 }
 
 function filePathFromHash(hash: string): string | null {
